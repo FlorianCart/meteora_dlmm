@@ -10,6 +10,7 @@ import DLMM, {
 import { Keypair, PublicKey } from "@solana/web3.js";
 import type { OpenedPositionResult, OpenPositionRequest } from "../types.js";
 import { RpcService } from "../services/RpcService.js";
+import { logger } from "../utils/logger.js";
 
 export class MeteoraDlmmClient {
   private readonly clients = new Map<string, Promise<DLMM>>();
@@ -88,6 +89,15 @@ export class MeteoraDlmmClient {
     const range = getPositionLowerUpperBinIdWithLiquidity(position.positionData);
     const fromBinId = range?.lowerBinId.toNumber() ?? position.positionData.lowerBinId;
     const toBinId = range?.upperBinId.toNumber() ?? position.positionData.upperBinId;
+    logger.warn(
+      {
+        position: positionAddress,
+        pool: poolAddress,
+        fromBinId,
+        toBinId
+      },
+      "Building DLMM remove liquidity transaction"
+    );
 
     const txs = await dlmm.removeLiquidity({
       user: owner.publicKey,
@@ -97,6 +107,7 @@ export class MeteoraDlmmClient {
       bps: new BN(BASIS_POINT_MAX),
       shouldClaimAndClose: true
     });
+    logger.warn({ position: positionAddress, pool: poolAddress, txCount: txs.length }, "Sending DLMM exit transactions");
 
     const signatures: string[] = [];
     for (const [index, tx] of txs.entries()) {
@@ -107,6 +118,16 @@ export class MeteoraDlmmClient {
         owner.publicKey
       );
       signatures.push(signature);
+      logger.info(
+        {
+          position: positionAddress,
+          pool: poolAddress,
+          index: index + 1,
+          total: txs.length,
+          signature
+        },
+        "DLMM exit transaction confirmed"
+      );
     }
     await dlmm.refetchStates();
     return signatures;

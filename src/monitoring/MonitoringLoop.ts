@@ -180,9 +180,11 @@ export class MonitoringLoop {
       throw new Error("Wallet is required to exit a managed position.");
     }
 
+    logger.warn({ position: position.positionAddress, reason }, "Exit workflow started");
     const txs = await this.manager.exit(position, this.owner);
     await this.store.recordClosed(position.id, txs, nowIso(), reason);
     const closedPosition = this.store.get(position.id) ?? position;
+    logger.info({ position: position.positionAddress, txs, reason }, "DLMM position closed");
 
     if (this.postExitSwap) {
       try {
@@ -193,7 +195,7 @@ export class MonitoringLoop {
       }
     }
 
-    logger.info({ position: position.positionAddress, txs, reason }, "Position closed");
+    logger.info({ position: position.positionAddress, reason }, "Exit workflow complete");
 
     if (this.onPositionClosed) {
       await this.onPositionClosed(closedPosition, reason);
