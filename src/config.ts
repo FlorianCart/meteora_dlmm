@@ -84,6 +84,7 @@ const schema = z.object({
   JUPITER_REQUIRE_MINT_AUTHORITY_DISABLED: boolDefault(true),
   JUPITER_REQUIRE_FREEZE_AUTHORITY_DISABLED: boolDefault(true),
   WEB_PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
+  WEB_HOST: z.string().default("127.0.0.1"),
   PAPER_STATE_PATH: z.string().default("./data/paper-state.json"),
   PAPER_STARTING_BALANCE_USD: z.coerce.number().min(1).default(10_000),
   PAPER_POSITION_SIZE_USD: z.coerce.number().min(1).default(500),
@@ -174,7 +175,8 @@ export const config = {
     jupiterRequireFreezeAuthorityDisabled: env.JUPITER_REQUIRE_FREEZE_AUTHORITY_DISABLED
   },
   web: {
-    port: env.WEB_PORT
+    port: env.WEB_PORT,
+    host: env.WEB_HOST
   },
   paper: {
     statePath: env.PAPER_STATE_PATH,

@@ -72,8 +72,8 @@ async function main(): Promise<void> {
     res.status(500).json({ error: message });
   });
 
-  app.listen(config.web.port, () => {
-    logger.info(`Paper dashboard listening on http://localhost:${config.web.port}`);
+  app.listen(config.web.port, config.web.host, () => {
+    logger.info(`Paper dashboard listening on http://${config.web.host}:${config.web.port}`);
   });
 }
 
