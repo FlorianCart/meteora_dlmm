@@ -83,6 +83,10 @@ export class RpcService {
   }
 
   private addComputeBudget(transaction: Transaction): void {
+    if (transaction.instructions.some((instruction) => instruction.programId.equals(ComputeBudgetProgram.programId))) {
+      return;
+    }
+
     const prepend = [];
     if (this.options.computeUnitLimit > 0) {
       prepend.push(ComputeBudgetProgram.setComputeUnitLimit({ units: this.options.computeUnitLimit }));
