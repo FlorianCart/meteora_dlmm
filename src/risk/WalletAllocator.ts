@@ -5,6 +5,9 @@ import { RpcService } from "../services/RpcService.js";
 
 export interface WalletAllocatorOptions {
   allocationPct: number;
+  reserveSolPct: number;
+  minPositionSolPct: number;
+  maxPositionSolPct: number;
   minSolReserve: number;
   minPositionSol: number;
   maxPositionSol: number;
@@ -20,6 +23,9 @@ export interface EntryAllocation {
   walletSol: number;
   activeExposureSol: number;
   totalCapitalSol: number;
+  reserveSol: number;
+  minPositionSol: number;
+  maxPositionSol: number;
   remainingDeployableSol: number;
   solPriceUsd: number;
   solSide: "x" | "y" | "none";
@@ -52,15 +58,23 @@ export class WalletAllocator {
     const walletSol = await this.walletSolBalance();
     const activeExposureSol = this.activeExposureSol(solPriceUsd);
     const totalCapitalSol = walletSol + activeExposureSol;
+    const reserveSol = Math.max(this.options.minSolReserve, totalCapitalSol * (this.options.reserveSolPct / 100));
+    const minPositionSol = Math.max(
+      this.options.minPositionSol,
+      totalCapitalSol * (this.options.minPositionSolPct / 100)
+    );
+    const dynamicMaxPositionSol = totalCapitalSol * (this.options.maxPositionSolPct / 100);
+    const maxPositionSol =
+      this.options.maxPositionSol > 0
+        ? Math.min(dynamicMaxPositionSol, this.options.maxPositionSol)
+        : dynamicMaxPositionSol;
     const maxDeployableSol = totalCapitalSol * (this.options.maxTotalExposurePct / 100);
     const remainingDeployableSol = Math.max(0, maxDeployableSol - activeExposureSol);
-    const usableWalletSol = Math.max(0, walletSol - this.options.minSolReserve);
-    const walletRatioSol = usableWalletSol * (this.options.allocationPct / 100);
-    const cappedPositionSol =
-      this.options.maxPositionSol > 0 ? Math.min(walletRatioSol, this.options.maxPositionSol) : walletRatioSol;
-    const positionSol = Math.min(cappedPositionSol, remainingDeployableSol);
+    const usableWalletSol = Math.max(0, walletSol - reserveSol);
+    const targetPositionSol = totalCapitalSol * (this.options.allocationPct / 100);
+    const positionSol = Math.min(targetPositionSol, usableWalletSol, remainingDeployableSol, maxPositionSol);
 
-    if (positionSol < this.options.minPositionSol) {
+    if (positionSol < minPositionSol) {
       return null;
     }
 
@@ -71,6 +85,9 @@ export class WalletAllocator {
       walletSol,
       activeExposureSol,
       totalCapitalSol,
+      reserveSol,
+      minPositionSol,
+      maxPositionSol,
       remainingDeployableSol,
       solPriceUsd,
       solSide,

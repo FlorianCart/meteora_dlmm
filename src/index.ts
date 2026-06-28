@@ -147,6 +147,9 @@ async function buildServices(): Promise<{
   const allocator = owner
     ? new WalletAllocator(rpc, store, owner.publicKey, {
         allocationPct: config.entry.walletAllocationPct,
+        reserveSolPct: config.entry.reserveSolPct,
+        minPositionSolPct: config.entry.minPositionSolPct,
+        maxPositionSolPct: config.entry.maxPositionSolPct,
         minSolReserve: config.entry.minSolReserve,
         minPositionSol: config.entry.minPositionSol,
         maxPositionSol: config.entry.maxPositionSol,
@@ -220,6 +223,9 @@ async function resolveEntryAllocation(
       walletSol: allocation.walletSol,
       activeExposureSol: allocation.activeExposureSol,
       totalCapitalSol: allocation.totalCapitalSol,
+      reserveSol: allocation.reserveSol,
+      minPositionSol: allocation.minPositionSol,
+      maxPositionSol: allocation.maxPositionSol,
       remainingDeployableSol: allocation.remainingDeployableSol,
       solSide: allocation.solSide,
       solOnly: config.entry.solOnly

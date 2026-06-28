@@ -16,7 +16,7 @@ npm run typecheck
 
 Par defaut, le bot ne trade pas. Les transactions d'entree ne partent que si `AUTO_OPEN=true` et `WALLET_PRIVATE_KEY` est renseigne.
 
-Pour un test live avec un petit wallet SOL, le mode par defaut est `ENTRY_SIZING_MODE=wallet-ratio`: le bot calcule la taille de la prochaine position depuis le solde SOL disponible, l'exposition deja ouverte, une reserve minimale et un plafond global. Avec les valeurs d'exemple, un wallet de `0.5 SOL` garde `0.05 SOL` de reserve, ne deploie pas plus de 70% du capital total, et borne chaque nouvelle position a `0.1 SOL`. `ENTRY_SOL_ONLY=true` force une entree single-sided sur le cote SOL de la pool, sans supposer que le wallet possede deja le token risque.
+Pour un test live avec un petit wallet SOL, le mode par defaut est `ENTRY_SIZING_MODE=wallet-ratio`: le bot calcule la taille de la prochaine position depuis le solde SOL disponible et l'exposition deja ouverte. Les valeurs d'exemple sont des ratios: reserve `10%`, taille cible `25%`, taille minimale `4%`, taille maximale `20%`, exposition totale maximale `70%`. Sur un wallet de `0.5 SOL`, cela donne naturellement environ `0.05 SOL` de reserve, `0.02 SOL` de minimum et `0.1 SOL` de maximum par position, mais ces montants changent si le wallet change. `ENTRY_SOL_ONLY=true` force une entree single-sided sur le cote SOL de la pool, sans supposer que le wallet possede deja le token risque.
 
 Les sorties live utilisent `TAKE_PROFIT_PCT=5` et `STOP_LOSS_PCT=-12` dans `.env.example`. Si tu ecris `STOP_LOSS_PCT=12`, le bot le normalise en `-12`.
 

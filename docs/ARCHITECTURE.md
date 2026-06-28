@@ -79,14 +79,17 @@ Pour un test live avec un wallet limite, `ENTRY_SIZING_MODE=wallet-ratio` rempla
 wallet_sol              = solde natif du wallet
 active_exposure_sol     = positions_ouvertes_usd / prix_SOL_usd
 total_capital_sol       = wallet_sol + active_exposure_sol
+reserve_sol             = max(override_SOL, total_capital_sol * ENTRY_RESERVE_SOL_PCT / 100)
+min_position_sol        = max(override_SOL, total_capital_sol * ENTRY_MIN_POSITION_SOL_PCT / 100)
+max_position_sol        = total_capital_sol * ENTRY_MAX_POSITION_SOL_PCT / 100
 max_deployable_sol      = total_capital_sol * ENTRY_MAX_TOTAL_EXPOSURE_PCT / 100
 remaining_deployable    = max(0, max_deployable_sol - active_exposure_sol)
-usable_wallet_sol       = max(0, wallet_sol - ENTRY_MIN_SOL_RESERVE)
-desired_position_sol    = usable_wallet_sol * ENTRY_WALLET_ALLOCATION_PCT / 100
-position_sol            = min(desired_position_sol, remaining_deployable, ENTRY_MAX_POSITION_SOL)
+usable_wallet_sol       = max(0, wallet_sol - reserve_sol)
+target_position_sol     = total_capital_sol * ENTRY_WALLET_ALLOCATION_PCT / 100
+position_sol            = min(target_position_sol, usable_wallet_sol, remaining_deployable, max_position_sol)
 ```
 
-La position est refusee si `position_sol < ENTRY_MIN_POSITION_SOL`. Avec `ENTRY_REQUIRE_SOL_POOL=true`, seules les pools contenant SOL sont candidates. Avec `ENTRY_SOL_ONLY=true`, le bot envoie seulement le cote SOL de la position (`singleSidedX=true` si SOL est token X, `singleSidedX=false` si SOL est token Y) et desactive l'auto-fill du deuxieme token. C'est volontaire pour un wallet de test finance uniquement en SOL: une vraie position balancee demanderait soit de posseder deja le token risque, soit d'ajouter une etape de swap avant l'ajout de liquidite.
+La position est refusee si `position_sol < min_position_sol`. Les anciens champs absolus `ENTRY_MIN_SOL_RESERVE`, `ENTRY_MIN_POSITION_SOL` et `ENTRY_MAX_POSITION_SOL` restent disponibles comme overrides optionnels; avec `0`, seuls les ratios pilotent le sizing. Avec `ENTRY_REQUIRE_SOL_POOL=true`, seules les pools contenant SOL sont candidates. Avec `ENTRY_SOL_ONLY=true`, le bot envoie seulement le cote SOL de la position (`singleSidedX=true` si SOL est token X, `singleSidedX=false` si SOL est token Y) et desactive l'auto-fill du deuxieme token. C'est volontaire pour un wallet de test finance uniquement en SOL: une vraie position balancee demanderait soit de posseder deja le token risque, soit d'ajouter une etape de swap avant l'ajout de liquidite.
 
 ### MeteoraDlmmClient
 
