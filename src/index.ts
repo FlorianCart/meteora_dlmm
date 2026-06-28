@@ -13,8 +13,9 @@ import { PostExitSwapService } from "./services/PostExitSwapService.js";
 import { RpcService } from "./services/RpcService.js";
 import { RugCheckApi } from "./services/RugCheckApi.js";
 import { PositionStore } from "./state/PositionStore.js";
-import type { ScoredPool } from "./types.js";
+import type { ExitReason, ManagedPositionState, ScoredPool } from "./types.js";
 import { logger } from "./utils/logger.js";
+import { sleep } from "./utils/time.js";
 import { loadKeypair } from "./wallet.js";
 import { PositionValuator } from "./valuation/PositionValuator.js";
 
@@ -49,21 +50,7 @@ async function main(): Promise<void> {
   }
 
   const selection = await selectEntry(scored, services);
-  const { target, allocation } = selection;
-  const opened = await services.positionManager.open({
-    pool: target.pool,
-    owner: services.owner,
-    amountXUi: allocation.amountXUi,
-    amountYUi: allocation.amountYUi,
-    rangeBins: config.entry.rangeBins,
-    slippagePct: config.entry.slippagePct,
-    takeProfitPct: config.entry.takeProfitPct,
-    stopLossPct: config.entry.stopLossPct,
-    autoFillBalancedAmounts: allocation.autoFillBalancedAmounts,
-    ...(allocation.singleSidedX !== undefined ? { singleSidedX: allocation.singleSidedX } : {})
-  });
-
-  logger.info({ position: opened.positionAddress, pool: opened.poolAddress }, "Opened managed position");
+  await openSelectedPosition(selection.target, selection.allocation, services, "Opened managed position");
   await runMonitor(services);
 }
 
@@ -195,7 +182,14 @@ async function buildServices(): Promise<{
         solOnly: config.entry.solOnly
       })
     : null;
-  const monitor = new MonitoringLoop(store, positionManager, owner, config.monitor, postExitSwap);
+  const autoReopen = createAutoReopenHandler({
+    scanner,
+    store,
+    positionManager,
+    allocator,
+    owner
+  });
+  const monitor = new MonitoringLoop(store, positionManager, owner, config.monitor, postExitSwap, autoReopen);
 
   return {
     scanner,
@@ -206,6 +200,100 @@ async function buildServices(): Promise<{
     allocator,
     owner
   };
+}
+
+interface EntryRuntimeServices {
+  scanner: PoolScanner;
+  store: PositionStore;
+  positionManager: PositionManager;
+  allocator: WalletAllocator | null;
+  owner: ReturnType<typeof loadKeypair> | null;
+}
+
+function createAutoReopenHandler(
+  services: EntryRuntimeServices
+): ((position: ManagedPositionState, reason: ExitReason) => Promise<void>) | null {
+  if (!config.autoReopenAfterExit) {
+    return null;
+  }
+
+  let queue = Promise.resolve();
+  return async (closedPosition: ManagedPositionState, reason: ExitReason): Promise<void> => {
+    queue = queue
+      .catch(() => undefined)
+      .then(async () => {
+        if (!services.owner) {
+          logger.warn(
+            { position: closedPosition.positionAddress, reason },
+            "Auto-reopen skipped because WALLET_PRIVATE_KEY is missing"
+          );
+          return;
+        }
+
+        await sleep(config.autoReopenDelayMs);
+
+        const activeCount = services.store.listActive().length;
+        if (activeCount >= config.maxOpenPositions) {
+          logger.info({ activeCount, maxOpenPositions: config.maxOpenPositions }, "Auto-reopen skipped at max capacity");
+          return;
+        }
+
+        try {
+          await openNextEligiblePosition(services, "Auto-opened replacement position");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.error({ position: closedPosition.positionAddress, reason, error: message }, "Auto-reopen failed");
+        }
+      });
+
+    await queue;
+  };
+}
+
+async function openNextEligiblePosition(
+  services: EntryRuntimeServices,
+  logMessage: string
+): Promise<ManagedPositionState> {
+  const scored = await services.scanner.scan();
+  printTopPools(scored);
+  const selection = await selectEntry(scored, services);
+  return openSelectedPosition(selection.target, selection.allocation, services, logMessage);
+}
+
+async function openSelectedPosition(
+  target: ScoredPool,
+  allocation: Pick<EntryAllocation, "amountXUi" | "amountYUi" | "autoFillBalancedAmounts" | "singleSidedX">,
+  services: Pick<EntryRuntimeServices, "positionManager" | "owner">,
+  logMessage: string
+): Promise<ManagedPositionState> {
+  if (!services.owner) {
+    throw new Error("Opening a managed position requires WALLET_PRIVATE_KEY.");
+  }
+
+  const opened = await services.positionManager.open({
+    pool: target.pool,
+    owner: services.owner,
+    amountXUi: allocation.amountXUi,
+    amountYUi: allocation.amountYUi,
+    rangeBins: config.entry.rangeBins,
+    slippagePct: config.entry.slippagePct,
+    takeProfitPct: config.entry.takeProfitPct,
+    stopLossPct: config.entry.stopLossPct,
+    autoFillBalancedAmounts: allocation.autoFillBalancedAmounts,
+    ...(allocation.singleSidedX !== undefined ? { singleSidedX: allocation.singleSidedX } : {})
+  });
+
+  logger.info(
+    {
+      position: opened.positionAddress,
+      pool: opened.poolAddress,
+      rangeBins: config.entry.rangeBins,
+      takeProfitPct: config.entry.takeProfitPct,
+      stopLossPct: config.entry.stopLossPct
+    },
+    logMessage
+  );
+  return opened;
 }
 
 async function selectEntry(

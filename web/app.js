@@ -103,6 +103,7 @@ function renderLive(live) {
         const profitUsd = snapshot?.profitUsd ?? currentValue - p.entryValueUsd;
         const profitPct = snapshot?.profitPct ?? (p.entryValueUsd > 0 ? (profitUsd / p.entryValueUsd) * 100 : 0);
         const poolName = `${p.tokenX.symbol}-${p.tokenY.symbol}`;
+        const range = liveRangeStatus(p);
         return `
           <tr>
             <td title="${p.poolAddress}">${escapeHtml(poolName)}</td>
@@ -113,11 +114,12 @@ function renderLive(live) {
             <td class="num ${profitUsd >= 0 ? "positive" : "negative"}">${signedMoney(profitUsd)} / ${pct(profitPct)}</td>
             <td class="num">${pct(p.takeProfitPct)} / ${pct(p.stopLossPct)}</td>
             <td class="num">${p.lowerBinId} -> ${p.upperBinId}</td>
+            <td title="${escapeHtml(range.title)}"><span class="tag ${range.className}">${escapeHtml(range.label)}</span></td>
             <td title="${p.positionAddress}">${shortAddress(p.positionAddress)}</td>
           </tr>
         `;
       })
-      .join("") || `<tr><td class="empty" colspan="9">No live positions tracked</td></tr>`;
+      .join("") || `<tr><td class="empty" colspan="10">No live positions tracked</td></tr>`;
 }
 
 function renderEquity(history) {
@@ -266,6 +268,36 @@ function liveStatusClass(status) {
   return "";
 }
 
+function liveRangeStatus(position) {
+  const activeBinId = position.lastSnapshot?.activeBinId;
+  if (typeof activeBinId !== "number") {
+    return { label: "--", className: "", title: "No active bin snapshot yet" };
+  }
+
+  if (activeBinId > position.upperBinId) {
+    const elapsed = position.outOfRangeSince ? elapsedLabel(position.outOfRangeSince) : "0s";
+    return {
+      label: `Above ${elapsed}`,
+      className: "warn",
+      title: `Active bin ${activeBinId} is above upper bin ${position.upperBinId}`
+    };
+  }
+
+  if (activeBinId < position.lowerBinId) {
+    return {
+      label: "Below",
+      className: "warn",
+      title: `Active bin ${activeBinId} is below lower bin ${position.lowerBinId}`
+    };
+  }
+
+  return {
+    label: `In ${activeBinId}`,
+    className: "good",
+    title: `Active bin ${activeBinId} is inside ${position.lowerBinId} -> ${position.upperBinId}`
+  };
+}
+
 function valueClass(value) {
   return String(value).startsWith("-") ? "negative" : "";
 }
@@ -289,6 +321,16 @@ function relative(iso) {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   return `${hours}h ago`;
+}
+
+function elapsedLabel(iso) {
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const restSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${restSeconds}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
 }
 
 function escapeHtml(value) {
@@ -324,6 +366,6 @@ $("resetBtn").addEventListener("click", () => {
   if (confirm("Reset paper state?")) action("/api/paper/reset");
 });
 
-window.addEventListener("resize", () => latestStatus && renderEquity(latestStatus.state.equityHistory));
+window.addEventListener("resize", () => latestStatus && renderEquity(latestStatus.paper.state.equityHistory));
 refresh().catch(console.error);
 setInterval(refresh, 3000);

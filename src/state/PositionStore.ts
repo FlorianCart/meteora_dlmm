@@ -1,6 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { ExitReason, ManagedPositionState, PositionStatus, ProfitSnapshot } from "../types.js";
+import type {
+  ExitReason,
+  ManagedPositionState,
+  OutOfRangeDirection,
+  PositionStatus,
+  ProfitSnapshot
+} from "../types.js";
 
 interface PositionStoreFile {
   positions: ManagedPositionState[];
@@ -70,6 +76,23 @@ export class PositionStore {
     await this.flush();
   }
 
+  async recordOutOfRange(id: string, direction: OutOfRangeDirection, since: string): Promise<void> {
+    const position = this.require(id);
+    this.positions.set(id, {
+      ...position,
+      outOfRangeDirection: direction,
+      outOfRangeSince: since
+    });
+    await this.flush();
+  }
+
+  async clearOutOfRange(id: string): Promise<void> {
+    const position = this.require(id);
+    const { outOfRangeDirection: _direction, outOfRangeSince: _since, ...positionInRange } = position;
+    this.positions.set(id, positionInRange);
+    await this.flush();
+  }
+
   async recordError(id: string, message: string): Promise<void> {
     const position = this.require(id);
     this.positions.set(id, {
@@ -82,8 +105,9 @@ export class PositionStore {
 
   async recordClosed(id: string, txs: string[], closedAt: string, exitReason?: ExitReason): Promise<void> {
     const position = this.require(id);
+    const { outOfRangeDirection: _direction, outOfRangeSince: _since, ...positionWithoutOutOfRange } = position;
     this.positions.set(id, {
-      ...position,
+      ...positionWithoutOutOfRange,
       status: "CLOSED",
       ...(exitReason ? { exitReason } : {}),
       exitTxs: txs,

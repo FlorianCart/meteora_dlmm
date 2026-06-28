@@ -35,10 +35,14 @@ const schema = z.object({
   COMMITMENT: z.enum(["processed", "confirmed", "finalized"]).default("confirmed"),
   WALLET_PRIVATE_KEY: z.string().optional(),
   AUTO_OPEN: boolDefault(false),
+  AUTO_REOPEN_AFTER_EXIT: boolDefault(true),
+  AUTO_REOPEN_DELAY_MS: z.coerce.number().int().min(0).default(5_000),
   POSITION_STORE_PATH: z.string().default("./data/positions.json"),
   MAX_OPEN_POSITIONS: z.coerce.number().int().min(1).max(10).default(10),
   MONITOR_INTERVAL_MS: z.coerce.number().int().min(5_000).default(30_000),
   MONITOR_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(3),
+  OUT_OF_RANGE_UP_EXIT_ENABLED: boolDefault(true),
+  OUT_OF_RANGE_UP_COOLDOWN_MS: z.coerce.number().int().min(0).default(300_000),
   TAKE_PROFIT_PCT: z.coerce.number().min(0.01).default(5),
   STOP_LOSS_PCT: z.coerce.number().default(-12),
   ENTRY_SIZING_MODE: z.enum(["fixed", "wallet-ratio"]).default("wallet-ratio"),
@@ -121,11 +125,15 @@ export const config = {
   },
   walletPrivateKey: env.WALLET_PRIVATE_KEY,
   autoOpen: env.AUTO_OPEN,
+  autoReopenAfterExit: env.AUTO_REOPEN_AFTER_EXIT,
+  autoReopenDelayMs: env.AUTO_REOPEN_DELAY_MS,
   positionStorePath: env.POSITION_STORE_PATH,
   maxOpenPositions: env.MAX_OPEN_POSITIONS,
   monitor: {
     intervalMs: env.MONITOR_INTERVAL_MS,
-    concurrency: env.MONITOR_CONCURRENCY
+    concurrency: env.MONITOR_CONCURRENCY,
+    outOfRangeUpExitEnabled: env.OUT_OF_RANGE_UP_EXIT_ENABLED,
+    outOfRangeUpCooldownMs: env.OUT_OF_RANGE_UP_COOLDOWN_MS
   },
   entry: {
     sizingMode: env.ENTRY_SIZING_MODE,

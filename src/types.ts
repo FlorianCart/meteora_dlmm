@@ -234,7 +234,8 @@ export interface ScoredPool {
 }
 
 export type PositionStatus = "OPEN" | "EXITING" | "CLOSED" | "ERROR";
-export type ExitReason = "TAKE_PROFIT" | "STOP_LOSS" | "MANUAL";
+export type ExitReason = "TAKE_PROFIT" | "STOP_LOSS" | "MANUAL" | "OUT_OF_RANGE_UP";
+export type OutOfRangeDirection = "ABOVE" | "BELOW";
 
 export interface ProfitSnapshot {
   timestamp: string;
@@ -281,6 +282,8 @@ export interface ManagedPositionState {
   lastSnapshot?: ProfitSnapshot;
   errorCount: number;
   lastError?: string;
+  outOfRangeSince?: string;
+  outOfRangeDirection?: OutOfRangeDirection;
   exitReason?: ExitReason;
   exitTxs?: string[];
   closedAt?: string;

@@ -22,6 +22,8 @@ Les sorties live utilisent `TAKE_PROFIT_PCT=5` et `STOP_LOSS_PCT=-12` dans `.env
 
 La range DLMM est definie par `BID_ASK_RANGE_BINS=69`. En position balancee, cela signifie 69 bins au total autour du bin actif. En `ENTRY_SOL_ONLY=true`, le bot decale la range du cote single-sided pour avoir 69 bins utiles avec le token depose. L'ancien `BID_ASK_HALF_WIDTH_BINS` reste accepte en fallback, mais la config force au minimum 69 bins.
 
+Le monitor surveille aussi la sortie de range vers le haut. Avec `OUT_OF_RANGE_UP_EXIT_ENABLED=true`, si `activeBinId` passe au-dessus de `upperBinId`, le bot demarre un cooldown persistant de `OUT_OF_RANGE_UP_COOLDOWN_MS=300000` ms. Si le prix revient dans la range avant 5 minutes, le cooldown est annule. Sinon, la position est fermee a 100%, les tokens non-SOL sont balayes vers SOL, puis `AUTO_REOPEN_AFTER_EXIT=true` relance un scan pour ouvrir une nouvelle position eligible avec le sizing wallet-ratio.
+
 Apres une sortie DLMM, le contrat rend les tokens de la position au wallet. Avec `POST_EXIT_SWAP_TO_SOL=true`, le bot swap automatiquement les tokens non-SOL de la pool vers SOL via Jupiter. Pour balayer manuellement les tokens recuperes d'anciennes positions deja fermees:
 
 ```bash

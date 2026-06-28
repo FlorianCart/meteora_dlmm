@@ -180,14 +180,16 @@ Cette mesure capture:
 
 Les couts de transaction et rent peuvent etre ajoutes comme `cost_basis_adjustment_usd` si l'on veut un PnL net comptable complet.
 
-## Sortie TP / SL
+## Sortie TP / SL / out of range
 
 Si `profit_pct >= TAKE_PROFIT_PCT`, le monitoring passe la position en `EXITING` avec `exitReason=TAKE_PROFIT`.
 
 Si `profit_pct <= STOP_LOSS_PCT`, le meme chemin de sortie est utilise avec `exitReason=STOP_LOSS`.
 La config accepte `STOP_LOSS_PCT=12` ou `STOP_LOSS_PCT=-12`; elle normalise toujours la valeur en seuil negatif.
 
-Dans les deux cas, il recupere les bins encore porteurs de liquidite/fees et appelle:
+Si `OUT_OF_RANGE_UP_EXIT_ENABLED=true` et que `activeBinId > upperBinId`, le monitoring considere que la position est sortie de range vers le haut. Il enregistre `outOfRangeSince` et `outOfRangeDirection=ABOVE` dans `PositionStore`. Si le prix revient dans la range avant `OUT_OF_RANGE_UP_COOLDOWN_MS`, le cooldown est efface. Si le prix reste au-dessus apres le cooldown, la position est fermee avec `exitReason=OUT_OF_RANGE_UP`.
+
+Dans ces cas, il recupere les bins encore porteurs de liquidite/fees et appelle:
 
 ```ts
 removeLiquidity({
@@ -202,7 +204,9 @@ removeLiquidity({
 
 Le SDK peut retourner plusieurs transactions. Elles sont envoyees sequentiellement pour garder l'etat de position coherent.
 
-Apres la sortie DLMM, les tokens retires reviennent au wallet. Si `POST_EXIT_SWAP_TO_SOL=true`, `PostExitSwapService` lit les soldes wallet des deux mints de la position, ignore SOL et les montants sous `POST_EXIT_SWAP_MIN_USD`, puis utilise Jupiter Swap API pour convertir les tokens non-SOL en SOL. Ce sweep est appele apres les sorties TP/SL, apres `start:exit-all`, et peut etre lance seul avec `start:sweep-to-sol` pour nettoyer les tokens deja recuperes d'une ancienne position fermee.
+Apres la sortie DLMM, les tokens retires reviennent au wallet. Si `POST_EXIT_SWAP_TO_SOL=true`, `PostExitSwapService` lit les soldes wallet des deux mints de la position, ignore SOL et les montants sous `POST_EXIT_SWAP_MIN_USD`, puis utilise Jupiter Swap API pour convertir les tokens non-SOL en SOL. Ce sweep est appele apres les sorties TP/SL/out-of-range, apres `start:exit-all`, et peut etre lance seul avec `start:sweep-to-sol` pour nettoyer les tokens deja recuperes d'une ancienne position fermee.
+
+Si `AUTO_REOPEN_AFTER_EXIT=true`, une fermeture declenchee par le monitor attend `AUTO_REOPEN_DELAY_MS`, relance le scanner, ignore les pools deja actives, recalcule la taille via `WalletAllocator`, puis ouvre une position de remplacement si une pool eligible existe. Les sorties manuelles `start:exit-all` ne declenchent pas cette reouverture.
 
 ## Gestion d'erreurs
 
