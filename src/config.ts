@@ -64,6 +64,7 @@ const schema = z.object({
   PRIORITY_FEE_MICRO_LAMPORTS: z.coerce.number().int().min(0).default(25_000),
   COMPUTE_UNIT_LIMIT: z.coerce.number().int().min(0).default(1_400_000),
   TX_MAX_RETRIES: z.coerce.number().int().min(1).max(10).default(5),
+  TX_CONFIRM_TIMEOUT_MS: z.coerce.number().int().min(2_000).default(15_000),
   SKIP_PREFLIGHT: boolDefault(false),
   METEORA_DATA_API_BASE: z.string().url().default("https://dlmm.datapi.meteora.ag"),
   SCANNER_PAGE_SIZE: z.coerce.number().int().min(1).max(1000).default(100),
@@ -158,6 +159,7 @@ export const config = {
     priorityFeeMicroLamports: env.PRIORITY_FEE_MICRO_LAMPORTS,
     computeUnitLimit: env.COMPUTE_UNIT_LIMIT,
     maxRetries: env.TX_MAX_RETRIES,
+    confirmTimeoutMs: env.TX_CONFIRM_TIMEOUT_MS,
     skipPreflight: env.SKIP_PREFLIGHT
   },
   scanner: {

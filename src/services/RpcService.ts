@@ -9,6 +9,7 @@ import {
   VersionedTransaction
 } from "@solana/web3.js";
 import { sleep, jitter } from "../utils/time.js";
+import { logger } from "../utils/logger.js";
 
 export interface RpcServiceOptions {
   rpcUrl: string;
@@ -17,6 +18,7 @@ export interface RpcServiceOptions {
   priorityFeeMicroLamports: number;
   computeUnitLimit: number;
   maxRetries: number;
+  confirmTimeoutMs: number;
   skipPreflight: boolean;
 }
 
@@ -43,6 +45,7 @@ export class RpcService {
 
     this.addComputeBudget(transaction);
     let lastError: unknown;
+    const pendingSignatures: string[] = [];
 
     for (let attempt = 0; attempt < this.options.maxRetries; attempt += 1) {
       try {
@@ -56,26 +59,34 @@ export class RpcService {
           maxRetries: 0,
           preflightCommitment: this.options.commitment
         });
+        pendingSignatures.push(signature);
+        logger.info({ label, signature, attempt: attempt + 1 }, "Transaction sent");
 
-        const confirmation = await this.connection.confirmTransaction(
+        await this.confirmTransactionWithTimeout(
           {
             signature,
             blockhash: blockhash.blockhash,
             lastValidBlockHeight: blockhash.lastValidBlockHeight
           },
-          this.options.commitment
+          label
         );
-
-        if (confirmation.value.err) {
-          throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
-        }
-
+        logger.info({ label, signature, attempt: attempt + 1 }, "Transaction confirmed");
         return signature;
       } catch (error) {
         lastError = error;
+        const confirmedSignature = await this.findConfirmedSignature(pendingSignatures);
+        if (confirmedSignature) {
+          logger.info({ label, signature: confirmedSignature }, "Previous transaction attempt confirmed");
+          return confirmedSignature;
+        }
+
         if (!this.isRetryable(error) || attempt + 1 >= this.options.maxRetries) {
           break;
         }
+        logger.warn(
+          { label, attempt: attempt + 1, nextAttempt: attempt + 2, error: messageFromError(error) },
+          "Retrying transaction with fresh blockhash"
+        );
         await sleep(jitter(Math.min(12_000, 750 * 2 ** attempt), 0.35));
       }
     }
@@ -93,6 +104,7 @@ export class RpcService {
     }
 
     let lastError: unknown;
+    const pendingSignatures: string[] = [];
     for (let attempt = 0; attempt < this.options.maxRetries; attempt += 1) {
       try {
         transaction.sign(signers);
@@ -101,18 +113,27 @@ export class RpcService {
           maxRetries: 0,
           preflightCommitment: this.options.commitment
         });
+        pendingSignatures.push(signature);
+        logger.info({ label, signature, attempt: attempt + 1 }, "Versioned transaction sent");
 
-        const confirmation = await this.connection.confirmTransaction(signature, this.options.commitment);
-        if (confirmation.value.err) {
-          throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
-        }
-
+        await this.confirmSignatureWithTimeout(signature, label);
+        logger.info({ label, signature, attempt: attempt + 1 }, "Versioned transaction confirmed");
         return signature;
       } catch (error) {
         lastError = error;
+        const confirmedSignature = await this.findConfirmedSignature(pendingSignatures);
+        if (confirmedSignature) {
+          logger.info({ label, signature: confirmedSignature }, "Previous versioned transaction attempt confirmed");
+          return confirmedSignature;
+        }
+
         if (!this.isRetryable(error) || attempt + 1 >= this.options.maxRetries) {
           break;
         }
+        logger.warn(
+          { label, attempt: attempt + 1, nextAttempt: attempt + 2, error: messageFromError(error) },
+          "Retrying versioned transaction"
+        );
         await sleep(jitter(Math.min(12_000, 750 * 2 ** attempt), 0.35));
       }
     }
@@ -141,10 +162,85 @@ export class RpcService {
     }
   }
 
+  private async confirmTransactionWithTimeout(
+    strategy: {
+      signature: string;
+      blockhash: string;
+      lastValidBlockHeight: number;
+    },
+    label: string
+  ): Promise<void> {
+    const confirmation = await Promise.race([
+      this.connection.confirmTransaction(strategy, this.options.commitment),
+      sleep(this.options.confirmTimeoutMs).then(() => {
+        throw new Error(`${label} confirmation timeout after ${this.options.confirmTimeoutMs}ms`);
+      })
+    ]);
+
+    if (confirmation.value.err) {
+      throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+  }
+
+  private async confirmSignatureWithTimeout(signature: string, label: string): Promise<void> {
+    const confirmation = await Promise.race([
+      this.connection.confirmTransaction(signature, this.options.commitment),
+      sleep(this.options.confirmTimeoutMs).then(() => {
+        throw new Error(`${label} confirmation timeout after ${this.options.confirmTimeoutMs}ms`);
+      })
+    ]);
+
+    if (confirmation.value.err) {
+      throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+  }
+
+  private async findConfirmedSignature(signatures: string[]): Promise<string | null> {
+    const uniqueSignatures = [...new Set(signatures)];
+    if (uniqueSignatures.length === 0) {
+      return null;
+    }
+
+    const statuses = await this.connection.getSignatureStatuses(uniqueSignatures, {
+      searchTransactionHistory: false
+    });
+    for (const [index, status] of statuses.value.entries()) {
+      if (!status || status.err || !this.hasReachedConfiguredCommitment(status.confirmationStatus)) {
+        continue;
+      }
+
+      const signature = uniqueSignatures[index];
+      if (signature) {
+        return signature;
+      }
+    }
+    return null;
+  }
+
+  private hasReachedConfiguredCommitment(status: "processed" | "confirmed" | "finalized" | null | undefined): boolean {
+    if (!status) {
+      return false;
+    }
+
+    if (this.options.commitment === "finalized") {
+      return status === "finalized";
+    }
+
+    if (this.options.commitment === "confirmed") {
+      return status === "confirmed" || status === "finalized";
+    }
+
+    return status === "processed" || status === "confirmed" || status === "finalized";
+  }
+
   private isRetryable(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return /blockhash|expired|timeout|429|503|temporar|dropped|not confirmed|fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|rate/i.test(
       message
     );
   }
+}
+
+function messageFromError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

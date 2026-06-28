@@ -30,6 +30,8 @@ Apres une sortie DLMM, le contrat rend les tokens de la position au wallet. Avec
 npm run start:sweep-to-sol
 ```
 
+Pour accelerer les sorties defensives, `TX_CONFIRM_TIMEOUT_MS` force un rebroadcast rapide si une transaction n'est pas confirmee assez vite. En live, un RPC premium + une priority fee plus haute reduisent beaucoup le temps entre `Exit workflow started` et `DLMM position closed`.
+
 L'interface paper-trading locale tourne sur `http://localhost:8787` par defaut. Elle utilise de l'argent fictif et ne signe aucune transaction.
 
 ## Arborescence

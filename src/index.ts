@@ -132,6 +132,7 @@ async function buildServices(): Promise<{
     priorityFeeMicroLamports: config.tx.priorityFeeMicroLamports,
     computeUnitLimit: config.tx.computeUnitLimit,
     maxRetries: config.tx.maxRetries,
+    confirmTimeoutMs: config.tx.confirmTimeoutMs,
     skipPreflight: config.tx.skipPreflight,
     ...(config.rpc.wsUrl ? { wsUrl: config.rpc.wsUrl } : {})
   };
