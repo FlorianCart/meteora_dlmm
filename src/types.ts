@@ -291,7 +291,7 @@ export interface OpenPositionRequest {
   owner: string;
   amountXRaw: string;
   amountYRaw: string;
-  halfWidthBins: number;
+  rangeBins: number;
   slippagePct: number;
   takeProfitPct: number;
   stopLossPct: number;

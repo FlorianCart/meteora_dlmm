@@ -118,13 +118,18 @@ L_i = P_i * x_i + y_i
 
 Dans un bin, le prix est fixe; le swap consomme la liquidite du bin actif puis traverse les bins suivants. La position LP detient des parts par bin. Quand le prix se deplace, la composition X/Y de la position change: c'est l'effet de divergence temporaire, equivalent a une impermanent loss realisee seulement si on retire.
 
-La strategie `BidAsk` place de la liquidite autour du bin actif de facon a capter le flux dans les deux directions. Le bot choisit:
+La strategie `BidAsk` place de la liquidite autour du bin actif de facon a capter le flux dans les deux directions. Le bot choisit une range totale en bins, centree sur le bin actif. Par defaut, `BID_ASK_RANGE_BINS=69`, ce qui donne 34 bins sous le prix, le bin actif, et 34 bins au-dessus:
 
 ```text
-minBinId = activeBin - BID_ASK_HALF_WIDTH_BINS
-maxBinId = activeBin + BID_ASK_HALF_WIDTH_BINS
+rangeBins = BID_ASK_RANGE_BINS
+lowerBins = floor((rangeBins - 1) / 2)
+upperBins = rangeBins - 1 - lowerBins
+minBinId = activeBin - lowerBins
+maxBinId = activeBin + upperBins
 strategyType = StrategyType.BidAsk
 ```
+
+L'ancien parametre `BID_ASK_HALF_WIDTH_BINS` est encore accepte comme fallback, mais la config force une range minimale de 69 bins pour eviter une position trop vite out of range.
 
 ## Calcul du profit reel
 

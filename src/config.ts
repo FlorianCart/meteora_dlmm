@@ -19,6 +19,16 @@ const optionalUrl = z
   .optional()
   .transform((value) => (value && value.length > 0 ? value : undefined));
 
+const optionalNumber = z
+  .string()
+  .optional()
+  .transform((value) => (value && value.length > 0 ? Number(value) : undefined));
+
+function resolveRangeBins(rangeBins: number | undefined, legacyHalfWidthBins: number | undefined): number {
+  const requested = rangeBins ?? (legacyHalfWidthBins !== undefined ? legacyHalfWidthBins * 2 + 1 : 69);
+  return Math.max(69, requested);
+}
+
 const schema = z.object({
   RPC_URL: z.string().url().default("https://api.mainnet-beta.solana.com"),
   RPC_WS_URL: optionalUrl,
@@ -44,7 +54,8 @@ const schema = z.object({
   ENTRY_MAX_TOTAL_EXPOSURE_PCT: z.coerce.number().min(0.1).max(100).default(70),
   ENTRY_REQUIRE_SOL_POOL: boolDefault(true),
   ENTRY_SOL_ONLY: boolDefault(true),
-  BID_ASK_HALF_WIDTH_BINS: z.coerce.number().int().min(1).max(69).default(10),
+  BID_ASK_RANGE_BINS: optionalNumber.pipe(z.coerce.number().int().min(69).max(1_400).optional()),
+  BID_ASK_HALF_WIDTH_BINS: optionalNumber.pipe(z.coerce.number().int().min(1).max(699).optional()),
   ENTRY_SLIPPAGE_PCT: z.coerce.number().min(0).max(100).default(0.5),
   PRIORITY_FEE_MICRO_LAMPORTS: z.coerce.number().int().min(0).default(25_000),
   COMPUTE_UNIT_LIMIT: z.coerce.number().int().min(0).default(1_400_000),
@@ -125,7 +136,7 @@ export const config = {
     maxTotalExposurePct: env.ENTRY_MAX_TOTAL_EXPOSURE_PCT,
     requireSolPool: env.ENTRY_REQUIRE_SOL_POOL,
     solOnly: env.ENTRY_SOL_ONLY,
-    halfWidthBins: env.BID_ASK_HALF_WIDTH_BINS,
+    rangeBins: resolveRangeBins(env.BID_ASK_RANGE_BINS, env.BID_ASK_HALF_WIDTH_BINS),
     slippagePct: env.ENTRY_SLIPPAGE_PCT,
     takeProfitPct: env.TAKE_PROFIT_PCT,
     stopLossPct: normalizeStopLossPct(env.STOP_LOSS_PCT)

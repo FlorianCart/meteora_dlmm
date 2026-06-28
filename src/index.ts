@@ -43,7 +43,7 @@ async function main(): Promise<void> {
     owner: services.owner,
     amountXUi: allocation.amountXUi,
     amountYUi: allocation.amountYUi,
-    halfWidthBins: config.entry.halfWidthBins,
+    rangeBins: config.entry.rangeBins,
     slippagePct: config.entry.slippagePct,
     takeProfitPct: config.entry.takeProfitPct,
     stopLossPct: config.entry.stopLossPct,

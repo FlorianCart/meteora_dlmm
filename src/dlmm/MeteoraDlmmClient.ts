@@ -22,8 +22,7 @@ export class MeteoraDlmmClient {
     await dlmm.refetchStates();
 
     const activeBin = await dlmm.getActiveBin();
-    const minBinId = activeBin.binId - request.halfWidthBins;
-    const maxBinId = activeBin.binId + request.halfWidthBins;
+    const { minBinId, maxBinId } = centeredRange(activeBin.binId, request.rangeBins);
     const { amountX, amountY } = this.resolveEntryAmounts({
       amountXRaw: request.amountXRaw,
       amountYRaw: request.amountYRaw,
@@ -175,4 +174,17 @@ export class MeteoraDlmmClient {
 
     return { amountX, amountY };
   }
+}
+
+function centeredRange(activeBinId: number, rangeBins: number): { minBinId: number; maxBinId: number } {
+  if (!Number.isInteger(rangeBins) || rangeBins < 1) {
+    throw new Error(`Invalid rangeBins: ${rangeBins}`);
+  }
+
+  const lowerBins = Math.floor((rangeBins - 1) / 2);
+  const upperBins = rangeBins - 1 - lowerBins;
+  return {
+    minBinId: activeBinId - lowerBins,
+    maxBinId: activeBinId + upperBins
+  };
 }

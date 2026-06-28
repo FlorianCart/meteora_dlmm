@@ -11,7 +11,7 @@ interface OpenManagedPositionParams {
   owner: Keypair;
   amountXUi: string;
   amountYUi: string;
-  halfWidthBins: number;
+  rangeBins: number;
   slippagePct: number;
   takeProfitPct: number;
   stopLossPct: number;
@@ -41,7 +41,7 @@ export class PositionManager {
         owner: params.owner.publicKey.toBase58(),
         amountXRaw: amountXRaw.toString(),
         amountYRaw: amountYRaw.toString(),
-        halfWidthBins: params.halfWidthBins,
+        rangeBins: params.rangeBins,
         slippagePct: params.slippagePct,
         takeProfitPct: params.takeProfitPct,
         stopLossPct: params.stopLossPct,
