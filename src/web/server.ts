@@ -11,6 +11,8 @@ import { logger } from "../utils/logger.js";
 interface LiveStatus {
   positionStorePath: string;
   updatedAt: string | null;
+  outOfRangeUpCooldownMs: number;
+  autoReopenAfterExit: boolean;
   activeCount: number;
   closedCount: number;
   entryValueUsd: number;
@@ -119,6 +121,8 @@ async function liveStatus(): Promise<LiveStatus> {
   return {
     positionStorePath: config.positionStorePath,
     updatedAt,
+    outOfRangeUpCooldownMs: config.monitor.outOfRangeUpCooldownMs,
+    autoReopenAfterExit: config.autoReopenAfterExit,
     activeCount: active.length,
     closedCount: closed.length,
     entryValueUsd,

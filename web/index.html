@@ -9,31 +9,55 @@
   <body>
     <div class="shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">Meteora DLMM</p>
-          <h1>Trading Bot</h1>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">M</span>
+          <div>
+            <p class="eyebrow">Meteora DLMM</p>
+            <h1>Trading desk</h1>
+          </div>
         </div>
         <div class="controls">
           <span id="runState" class="status-pill">Idle</span>
-          <button id="startBtn" class="primary">▶ Start</button>
-          <button id="stopBtn">■ Stop</button>
-          <button id="tickBtn">↻ Tick</button>
+          <button id="startBtn" class="primary"><span class="btn-icon">></span> Start</button>
+          <button id="stopBtn"><span class="btn-icon">X</span> Stop</button>
+          <button id="tickBtn"><span class="btn-icon">R</span> Tick</button>
           <button id="resetBtn" class="danger">Reset</button>
         </div>
       </header>
 
       <main>
-        <section class="section-title">
+        <section class="live-head">
           <div>
             <p class="eyebrow">Real funds</p>
-            <h2>Live positions</h2>
+            <h2>Live command center</h2>
           </div>
-          <span id="liveUpdated" class="muted">--</span>
+          <div class="live-meta">
+            <span id="liveUpdated" class="muted">--</span>
+            <span id="autoReopenState" class="mini-pill">--</span>
+          </div>
         </section>
 
-        <section class="metrics compact-metrics" id="liveMetrics"></section>
+        <section class="metrics live-metrics" id="liveMetrics"></section>
 
-        <section class="panel live-panel">
+        <section class="live-grid">
+          <section class="panel range-panel">
+            <div class="panel-head">
+              <h2>Range watch</h2>
+              <span id="rangeWatchCount" class="muted">--</span>
+            </div>
+            <div id="rangeAlerts" class="range-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Live exposure</h2>
+              <span id="liveExposureState" class="muted">--</span>
+            </div>
+            <div id="liveExposure" class="exposure-grid"></div>
+          </section>
+        </section>
+
+        <section class="panel live-panel wide-panel">
           <div class="panel-head">
             <h2>On-chain tracker</h2>
             <span id="livePositionCount" class="muted">0</span>
@@ -51,6 +75,7 @@
                   <th>TP / SL</th>
                   <th>Bins</th>
                   <th>Range</th>
+                  <th>Opened</th>
                   <th>Position</th>
                 </tr>
               </thead>
