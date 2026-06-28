@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Meteora DLMM Paper Bot</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Meteora DLMM</p>
+          <h1>Paper Bot</h1>
+        </div>
+        <div class="controls">
+          <span id="runState" class="status-pill">Idle</span>
+          <button id="startBtn" class="primary">▶ Start</button>
+          <button id="stopBtn">■ Stop</button>
+          <button id="tickBtn">↻ Tick</button>
+          <button id="resetBtn" class="danger">Reset</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="metrics" id="metrics"></section>
+
+        <section class="split">
+          <div class="panel chart-panel">
+            <div class="panel-head">
+              <h2>Equity</h2>
+              <span id="lastTick" class="muted">--</span>
+            </div>
+            <canvas id="equityChart" width="900" height="280"></canvas>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Events</h2>
+              <span id="busyState" class="muted">--</span>
+            </div>
+            <div id="events" class="events"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Positions</h2>
+            <span id="positionCount" class="muted">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pool</th>
+                  <th>Status</th>
+                  <th>Notional</th>
+                  <th>Value</th>
+                  <th>Fees</th>
+                  <th>PnL</th>
+                  <th>Jup</th>
+                  <th>Opened</th>
+                </tr>
+              </thead>
+              <tbody id="positions"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Candidates</h2>
+            <span id="scanCount" class="muted">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pool</th>
+                  <th>Score</th>
+                  <th>Age</th>
+                  <th>TVL</th>
+                  <th>Vol 30m</th>
+                  <th>Fee/TVL 30m</th>
+                  <th>Fee/TVL 1h</th>
+                  <th>Fee/TVL 24h</th>
+                  <th>Jup</th>
+                  <th>Decision</th>
+                </tr>
+              </thead>
+              <tbody id="candidates"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

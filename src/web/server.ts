@@ -1,0 +1,83 @@
+import express from "express";
+import { resolve } from "node:path";
+import { config } from "../config.js";
+import { PaperBotEngine } from "../paper/PaperBotEngine.js";
+import { PaperStore } from "../paper/PaperStore.js";
+import { createScannerStack } from "../serviceFactory.js";
+import { logger } from "../utils/logger.js";
+
+async function main(): Promise<void> {
+  const { scanner, meteoraData } = createScannerStack();
+  const store = new PaperStore(config.paper.statePath, config.paper.startingBalanceUsd);
+  await store.load();
+
+  const engine = new PaperBotEngine(store, scanner, meteoraData, {
+    positionSizeUsd: config.paper.positionSizeUsd,
+    maxPositions: config.paper.maxPositions,
+    scanIntervalMs: config.paper.scanIntervalMs,
+    takeProfitPct: config.paper.takeProfitPct,
+    stopLossPct: config.paper.stopLossPct,
+    maxFeeRatePerHourPct: config.paper.maxFeeRatePerHourPct
+  });
+
+  const app = express();
+  app.disable("x-powered-by");
+  app.use(express.json());
+  app.use(express.static(resolve(process.cwd(), "web")));
+
+  app.get("/api/status", async (_req, res, next) => {
+    try {
+      res.json(await engine.status());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/bot/start", async (_req, res, next) => {
+    try {
+      res.json(await engine.start());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/bot/stop", async (_req, res, next) => {
+    try {
+      res.json(await engine.stop());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/bot/tick", async (_req, res, next) => {
+    try {
+      res.json(await engine.tick());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/paper/reset", async (req, res, next) => {
+    try {
+      const balanceUsd = typeof req.body?.balanceUsd === "number" ? req.body.balanceUsd : undefined;
+      res.json(await engine.reset(balanceUsd));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(error, "Web request failed");
+    res.status(500).json({ error: message });
+  });
+
+  app.listen(config.web.port, () => {
+    logger.info(`Paper dashboard listening on http://localhost:${config.web.port}`);
+  });
+}
+
+main().catch((error) => {
+  logger.error(error, "Paper dashboard failed");
+  process.exitCode = 1;
+});
