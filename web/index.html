@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Meteora DLMM Paper Bot</title>
+    <title>Meteora DLMM Bot</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Meteora DLMM</p>
-          <h1>Paper Bot</h1>
+          <h1>Trading Bot</h1>
         </div>
         <div class="controls">
           <span id="runState" class="status-pill">Idle</span>
@@ -23,6 +23,48 @@
       </header>
 
       <main>
+        <section class="section-title">
+          <div>
+            <p class="eyebrow">Real funds</p>
+            <h2>Live positions</h2>
+          </div>
+          <span id="liveUpdated" class="muted">--</span>
+        </section>
+
+        <section class="metrics compact-metrics" id="liveMetrics"></section>
+
+        <section class="panel live-panel">
+          <div class="panel-head">
+            <h2>On-chain tracker</h2>
+            <span id="livePositionCount" class="muted">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pool</th>
+                  <th>Status</th>
+                  <th>Entry</th>
+                  <th>Current</th>
+                  <th>Fees</th>
+                  <th>PnL</th>
+                  <th>TP / SL</th>
+                  <th>Bins</th>
+                  <th>Position</th>
+                </tr>
+              </thead>
+              <tbody id="livePositions"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section-title paper-title">
+          <div>
+            <p class="eyebrow">Simulation</p>
+            <h2>Paper dashboard</h2>
+          </div>
+        </section>
+
         <section class="metrics" id="metrics"></section>
 
         <section class="split">

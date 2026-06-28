@@ -4,7 +4,22 @@ import { config } from "../config.js";
 import { PaperBotEngine } from "../paper/PaperBotEngine.js";
 import { PaperStore } from "../paper/PaperStore.js";
 import { createScannerStack } from "../serviceFactory.js";
+import { PositionStore } from "../state/PositionStore.js";
+import type { ManagedPositionState } from "../types.js";
 import { logger } from "../utils/logger.js";
+
+interface LiveStatus {
+  positionStorePath: string;
+  updatedAt: string | null;
+  activeCount: number;
+  closedCount: number;
+  entryValueUsd: number;
+  currentValueUsd: number;
+  profitUsd: number;
+  profitPct: number;
+  feeValueUsd: number;
+  positions: ManagedPositionState[];
+}
 
 async function main(): Promise<void> {
   const { scanner, meteoraData } = createScannerStack();
@@ -28,6 +43,14 @@ async function main(): Promise<void> {
   app.get("/api/status", async (_req, res, next) => {
     try {
       res.json(await engine.status());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/live/status", async (_req, res, next) => {
+    try {
+      res.json(await liveStatus());
     } catch (error) {
       next(error);
     }
@@ -75,6 +98,49 @@ async function main(): Promise<void> {
   app.listen(config.web.port, config.web.host, () => {
     logger.info(`Paper dashboard listening on http://${config.web.host}:${config.web.port}`);
   });
+}
+
+async function liveStatus(): Promise<LiveStatus> {
+  const store = new PositionStore(config.positionStorePath);
+  await store.load();
+  const positions = store.list();
+  const active = positions.filter((position) => position.status === "OPEN" || position.status === "EXITING");
+  const closed = positions.filter((position) => position.status === "CLOSED");
+  const entryValueUsd = active.reduce((sum, position) => sum + position.entryValueUsd, 0);
+  const currentValueUsd = active.reduce(
+    (sum, position) => sum + (position.lastSnapshot?.currentValueUsd ?? position.entryValueUsd),
+    0
+  );
+  const feeValueUsd = active.reduce((sum, position) => sum + (position.lastSnapshot?.feeValueUsd ?? 0), 0);
+  const profitUsd = currentValueUsd - entryValueUsd;
+  const profitPct = entryValueUsd > 0 ? (profitUsd / entryValueUsd) * 100 : 0;
+  const updatedAt = latestLiveUpdate(positions);
+
+  return {
+    positionStorePath: config.positionStorePath,
+    updatedAt,
+    activeCount: active.length,
+    closedCount: closed.length,
+    entryValueUsd,
+    currentValueUsd,
+    profitUsd,
+    profitPct,
+    feeValueUsd,
+    positions
+  };
+}
+
+function latestLiveUpdate(positions: ManagedPositionState[]): string | null {
+  const timestamps = positions
+    .flatMap((position) => [position.lastSnapshot?.timestamp, position.closedAt, position.openedAt])
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .map((value) => Date.parse(value))
+    .filter(Number.isFinite);
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+  return new Date(Math.max(...timestamps)).toISOString();
 }
 
 main().catch((error) => {

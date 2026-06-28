@@ -23,17 +23,19 @@ async function api(path, options = {}) {
 }
 
 async function refresh() {
-  latestStatus = await api("/api/status");
+  const [paper, live] = await Promise.all([api("/api/status"), api("/api/live/status")]);
+  latestStatus = { paper, live };
   render(latestStatus);
 }
 
 function render(status) {
-  renderHeader(status);
-  renderMetrics(status.metrics);
-  renderEquity(status.state.equityHistory);
-  renderEvents(status.state.events);
-  renderPositions(status.state.positions);
-  renderCandidates(status.lastScan);
+  renderHeader(status.paper);
+  renderLive(status.live);
+  renderMetrics(status.paper.metrics);
+  renderEquity(status.paper.state.equityHistory);
+  renderEvents(status.paper.state.events);
+  renderPositions(status.paper.state.positions);
+  renderCandidates(status.paper.lastScan);
 }
 
 function renderHeader(status) {
@@ -65,6 +67,57 @@ function renderMetrics(metrics) {
       `
     )
     .join("");
+}
+
+function renderLive(live) {
+  $("liveUpdated").textContent = live.updatedAt ? `Updated ${relative(live.updatedAt)}` : "No live snapshots";
+  const items = [
+    ["Active", String(live.activeCount), `${live.closedCount} closed`],
+    ["Entry", money.format(live.entryValueUsd), ""],
+    ["Current", money.format(live.currentValueUsd), ""],
+    ["Fees", money.format(live.feeValueUsd), ""],
+    ["Live PnL", signedMoney(live.profitUsd), pct(live.profitPct)]
+  ];
+
+  $("liveMetrics").innerHTML = items
+    .map(
+      ([label, value, delta]) => `
+        <div class="metric live-metric">
+          <div class="label">${label}</div>
+          <div class="value ${valueClass(value)}">${value}</div>
+          <div class="delta">${delta}</div>
+        </div>
+      `
+    )
+    .join("");
+
+  $("livePositionCount").textContent = `${live.activeCount} active`;
+  $("livePositions").innerHTML =
+    live.positions
+      .slice()
+      .sort((a, b) => Date.parse(b.openedAt) - Date.parse(a.openedAt))
+      .map((p) => {
+        const snapshot = p.lastSnapshot;
+        const currentValue = snapshot?.currentValueUsd ?? p.entryValueUsd;
+        const fees = snapshot?.feeValueUsd ?? 0;
+        const profitUsd = snapshot?.profitUsd ?? currentValue - p.entryValueUsd;
+        const profitPct = snapshot?.profitPct ?? (p.entryValueUsd > 0 ? (profitUsd / p.entryValueUsd) * 100 : 0);
+        const poolName = `${p.tokenX.symbol}-${p.tokenY.symbol}`;
+        return `
+          <tr>
+            <td title="${p.poolAddress}">${escapeHtml(poolName)}</td>
+            <td><span class="tag ${liveStatusClass(p.status)}">${p.status}</span></td>
+            <td class="num">${money.format(p.entryValueUsd)}</td>
+            <td class="num">${money.format(currentValue)}</td>
+            <td class="num">${money.format(fees)}</td>
+            <td class="num ${profitUsd >= 0 ? "positive" : "negative"}">${signedMoney(profitUsd)} / ${pct(profitPct)}</td>
+            <td class="num">${pct(p.takeProfitPct)} / ${pct(p.stopLossPct)}</td>
+            <td class="num">${p.lowerBinId} -> ${p.upperBinId}</td>
+            <td title="${p.positionAddress}">${shortAddress(p.positionAddress)}</td>
+          </tr>
+        `;
+      })
+      .join("") || `<tr><td class="empty" colspan="9">No live positions tracked</td></tr>`;
 }
 
 function renderEquity(history) {
@@ -206,6 +259,13 @@ function eventClass(type) {
   return "";
 }
 
+function liveStatusClass(status) {
+  if (status === "OPEN") return "good";
+  if (status === "EXITING") return "warn";
+  if (status === "ERROR") return "bad";
+  return "";
+}
+
 function valueClass(value) {
   return String(value).startsWith("-") ? "negative" : "";
 }
@@ -239,12 +299,18 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function shortAddress(value) {
+  const text = String(value);
+  if (text.length <= 12) return text;
+  return `${text.slice(0, 4)}...${text.slice(-4)}`;
+}
+
 async function action(path, body) {
   try {
     const options = { method: "POST" };
     if (body !== undefined) options.body = JSON.stringify(body);
-    latestStatus = await api(path, options);
-    render(latestStatus);
+    await api(path, options);
+    await refresh();
   } catch (error) {
     console.error(error);
     alert(error.message);

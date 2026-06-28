@@ -137,12 +137,33 @@ button.danger {
   margin-bottom: 12px;
 }
 
+.compact-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.section-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 14px 0 10px;
+}
+
+.paper-title {
+  margin-top: 20px;
+}
+
 .metric {
   min-height: 86px;
   padding: 13px 14px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.live-metric {
+  border-color: #b9d7ee;
+  background: #f7fbff;
 }
 
 .metric .label {
@@ -176,6 +197,10 @@ button.danger {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
+}
+
+.live-panel {
+  border-color: #b9d7ee;
 }
 
 .panel-head {
@@ -273,7 +298,8 @@ th {
 }
 
 @media (max-width: 1050px) {
-  .metrics {
+  .metrics,
+  .compact-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
@@ -297,7 +323,8 @@ th {
     justify-content: flex-start;
   }
 
-  .metrics {
+  .metrics,
+  .compact-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
