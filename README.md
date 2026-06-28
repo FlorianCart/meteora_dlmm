@@ -20,7 +20,7 @@ Pour un test live avec un petit wallet SOL, le mode par defaut est `ENTRY_SIZING
 
 Les sorties live utilisent `TAKE_PROFIT_PCT=5` et `STOP_LOSS_PCT=-12` dans `.env.example`. Si tu ecris `STOP_LOSS_PCT=12`, le bot le normalise en `-12`.
 
-La range DLMM est definie par `BID_ASK_RANGE_BINS=69`. Cela signifie 69 bins au total autour du bin actif, pas 69 bins de chaque cote. L'ancien `BID_ASK_HALF_WIDTH_BINS` reste accepte en fallback, mais la config force au minimum 69 bins.
+La range DLMM est definie par `BID_ASK_RANGE_BINS=69`. En position balancee, cela signifie 69 bins au total autour du bin actif. En `ENTRY_SOL_ONLY=true`, le bot decale la range du cote single-sided pour avoir 69 bins utiles avec le token depose. L'ancien `BID_ASK_HALF_WIDTH_BINS` reste accepte en fallback, mais la config force au minimum 69 bins.
 
 L'interface paper-trading locale tourne sur `http://localhost:8787` par defaut. Elle utilise de l'argent fictif et ne signe aucune transaction.
 

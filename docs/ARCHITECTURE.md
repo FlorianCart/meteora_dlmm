@@ -118,7 +118,9 @@ L_i = P_i * x_i + y_i
 
 Dans un bin, le prix est fixe; le swap consomme la liquidite du bin actif puis traverse les bins suivants. La position LP detient des parts par bin. Quand le prix se deplace, la composition X/Y de la position change: c'est l'effet de divergence temporaire, equivalent a une impermanent loss realisee seulement si on retire.
 
-La strategie `BidAsk` place de la liquidite autour du bin actif de facon a capter le flux dans les deux directions. Le bot choisit une range totale en bins, centree sur le bin actif. Par defaut, `BID_ASK_RANGE_BINS=69`, ce qui donne 34 bins sous le prix, le bin actif, et 34 bins au-dessus:
+La strategie `BidAsk` place de la liquidite autour du bin actif de facon a capter le flux dans les deux directions. Par defaut, `BID_ASK_RANGE_BINS=69`.
+
+Pour une position balancee, la range est centree sur le bin actif:
 
 ```text
 rangeBins = BID_ASK_RANGE_BINS
@@ -128,6 +130,15 @@ minBinId = activeBin - lowerBins
 maxBinId = activeBin + upperBins
 strategyType = StrategyType.BidAsk
 ```
+
+Pour une position single-sided, la range est decalee du cote compatible avec le token depose afin que les 69 bins soient réellement utilisables:
+
+```text
+singleSidedX=true   => minBinId = activeBin,                  maxBinId = activeBin + rangeBins - 1
+singleSidedX=false  => minBinId = activeBin - rangeBins + 1,  maxBinId = activeBin
+```
+
+Dans le cas d'un wallet SOL-only sur une pool `TOKEN-SOL`, SOL est generalement token Y, donc le bot place 69 bins de `activeBin - 68` a `activeBin`.
 
 L'ancien parametre `BID_ASK_HALF_WIDTH_BINS` est encore accepte comme fallback, mais la config force une range minimale de 69 bins pour eviter une position trop vite out of range.
 

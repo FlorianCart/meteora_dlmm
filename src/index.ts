@@ -20,6 +20,11 @@ async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
   const services = await buildServices();
 
+  if (args.has("--exit-all")) {
+    await exitAllPositions(services);
+    return;
+  }
+
   if (args.has("--monitor")) {
     await runMonitor(services);
     return;
@@ -241,6 +246,37 @@ async function runMonitor(services: { monitor: MonitoringLoop }): Promise<void> 
   process.once("SIGINT", () => controller.abort());
   process.once("SIGTERM", () => controller.abort());
   await services.monitor.run(controller.signal);
+}
+
+async function exitAllPositions(services: {
+  store: PositionStore;
+  positionManager: PositionManager;
+  owner: ReturnType<typeof loadKeypair> | null;
+}): Promise<void> {
+  if (!services.owner) {
+    throw new Error("--exit-all requires WALLET_PRIVATE_KEY.");
+  }
+
+  const active = services.store.listActive();
+  if (active.length === 0) {
+    logger.info("No active positions to exit");
+    return;
+  }
+
+  for (const position of active) {
+    logger.warn(
+      {
+        position: position.positionAddress,
+        pool: position.poolAddress,
+        status: position.status
+      },
+      "Manually exiting tracked position"
+    );
+    await services.store.setStatus(position.id, "EXITING", "MANUAL");
+    const txs = await services.positionManager.exit(position, services.owner);
+    await services.store.recordClosed(position.id, txs, new Date().toISOString(), "MANUAL");
+    logger.info({ position: position.positionAddress, txs }, "Manual exit complete");
+  }
 }
 
 function printTopPools(scored: ScoredPool[]): void {
