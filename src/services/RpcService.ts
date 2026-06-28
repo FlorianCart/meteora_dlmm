@@ -5,7 +5,8 @@ import {
   Connection,
   PublicKey,
   Signer,
-  Transaction
+  Transaction,
+  VersionedTransaction
 } from "@solana/web3.js";
 import { sleep, jitter } from "../utils/time.js";
 
@@ -65,6 +66,43 @@ export class RpcService {
           this.options.commitment
         );
 
+        if (confirmation.value.err) {
+          throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
+        }
+
+        return signature;
+      } catch (error) {
+        lastError = error;
+        if (!this.isRetryable(error) || attempt + 1 >= this.options.maxRetries) {
+          break;
+        }
+        await sleep(jitter(Math.min(12_000, 750 * 2 ** attempt), 0.35));
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  async sendVersionedTransaction(
+    transaction: VersionedTransaction,
+    signers: Signer[],
+    label: string
+  ): Promise<string> {
+    if (signers.length === 0) {
+      throw new Error(`No signer provided for ${label}`);
+    }
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt < this.options.maxRetries; attempt += 1) {
+      try {
+        transaction.sign(signers);
+        const signature = await this.connection.sendRawTransaction(transaction.serialize(), {
+          skipPreflight: this.options.skipPreflight,
+          maxRetries: 0,
+          preflightCommitment: this.options.commitment
+        });
+
+        const confirmation = await this.connection.confirmTransaction(signature, this.options.commitment);
         if (confirmation.value.err) {
           throw new Error(`${label} failed: ${JSON.stringify(confirmation.value.err)}`);
         }

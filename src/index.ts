@@ -7,7 +7,9 @@ import { PoolScanner } from "./scanner/PoolScanner.js";
 import { DexScreenerApi } from "./services/DexScreenerApi.js";
 import { HttpClient } from "./services/HttpClient.js";
 import { JupiterTokenApi } from "./services/JupiterTokenApi.js";
+import { JupiterSwapService } from "./services/JupiterSwapService.js";
 import { MeteoraDataApi } from "./services/MeteoraDataApi.js";
+import { PostExitSwapService } from "./services/PostExitSwapService.js";
 import { RpcService } from "./services/RpcService.js";
 import { RugCheckApi } from "./services/RugCheckApi.js";
 import { PositionStore } from "./state/PositionStore.js";
@@ -22,6 +24,11 @@ async function main(): Promise<void> {
 
   if (args.has("--exit-all")) {
     await exitAllPositions(services);
+    return;
+  }
+
+  if (args.has("--sweep-to-sol")) {
+    await sweepTrackedTokensToSol(services);
     return;
   }
 
@@ -65,6 +72,7 @@ async function buildServices(): Promise<{
   store: PositionStore;
   positionManager: PositionManager;
   monitor: MonitoringLoop;
+  postExitSwap: PostExitSwapService | null;
   allocator: WalletAllocator | null;
   owner: ReturnType<typeof loadKeypair> | null;
 }> {
@@ -149,6 +157,30 @@ async function buildServices(): Promise<{
   const valuator = new PositionValuator(meteoraData);
   const positionManager = new PositionManager(store, dlmm, valuator, config.maxOpenPositions);
   const owner = config.walletPrivateKey ? loadKeypair(config.walletPrivateKey) : null;
+  const jupiterSwapHeaders = config.apis.jupiterApiKey ? { "x-api-key": config.apis.jupiterApiKey } : undefined;
+  const postExitSwap = owner
+    ? new PostExitSwapService(
+        rpc,
+        new JupiterSwapService(
+          new HttpClient({
+            baseUrl: config.apis.jupiterSwapApiBase,
+            retries: 2,
+            timeoutMs: 15_000,
+            minIntervalMs: 150,
+            ...(jupiterSwapHeaders ? { defaultHeaders: jupiterSwapHeaders } : {})
+          }),
+          rpc,
+          {
+            slippageBps: config.postExitSwap.slippageBps,
+            restrictIntermediateTokens: config.postExitSwap.restrictIntermediateTokens
+          }
+        ),
+        {
+          enabled: config.postExitSwap.enabled,
+          minSwapUsd: config.postExitSwap.minSwapUsd
+        }
+      )
+    : null;
   const allocator = owner
     ? new WalletAllocator(rpc, store, owner.publicKey, {
         allocationPct: config.entry.walletAllocationPct,
@@ -163,13 +195,14 @@ async function buildServices(): Promise<{
         solOnly: config.entry.solOnly
       })
     : null;
-  const monitor = new MonitoringLoop(store, positionManager, owner, config.monitor);
+  const monitor = new MonitoringLoop(store, positionManager, owner, config.monitor, postExitSwap);
 
   return {
     scanner,
     store,
     positionManager,
     monitor,
+    postExitSwap,
     allocator,
     owner
   };
@@ -251,6 +284,7 @@ async function runMonitor(services: { monitor: MonitoringLoop }): Promise<void> 
 async function exitAllPositions(services: {
   store: PositionStore;
   positionManager: PositionManager;
+  postExitSwap: PostExitSwapService | null;
   owner: ReturnType<typeof loadKeypair> | null;
 }): Promise<void> {
   if (!services.owner) {
@@ -275,8 +309,26 @@ async function exitAllPositions(services: {
     await services.store.setStatus(position.id, "EXITING", "MANUAL");
     const txs = await services.positionManager.exit(position, services.owner);
     await services.store.recordClosed(position.id, txs, new Date().toISOString(), "MANUAL");
+    await services.postExitSwap?.sweepPositionTokensToSol(position, services.owner);
     logger.info({ position: position.positionAddress, txs }, "Manual exit complete");
   }
+}
+
+async function sweepTrackedTokensToSol(services: {
+  store: PositionStore;
+  postExitSwap: PostExitSwapService | null;
+  owner: ReturnType<typeof loadKeypair> | null;
+}): Promise<void> {
+  if (!services.owner) {
+    throw new Error("--sweep-to-sol requires WALLET_PRIVATE_KEY.");
+  }
+  if (!services.postExitSwap) {
+    throw new Error("Post-exit swap service is not available.");
+  }
+
+  const positions = services.store.list();
+  const swaps = await services.postExitSwap.sweepTrackedTokensToSol(positions, services.owner);
+  logger.info({ swaps }, "Tracked token sweep to SOL complete");
 }
 
 function printTopPools(scored: ScoredPool[]): void {

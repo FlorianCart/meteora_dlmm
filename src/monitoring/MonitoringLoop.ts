@@ -1,6 +1,7 @@
 import { Keypair } from "@solana/web3.js";
 import pLimit from "p-limit";
 import { PositionManager } from "../PositionManager.js";
+import { PostExitSwapService } from "../services/PostExitSwapService.js";
 import { PositionStore } from "../state/PositionStore.js";
 import type { ExitReason, ManagedPositionState } from "../types.js";
 import { logger } from "../utils/logger.js";
@@ -16,7 +17,8 @@ export class MonitoringLoop {
     private readonly store: PositionStore,
     private readonly manager: PositionManager,
     private readonly owner: Keypair | null,
-    private readonly options: MonitoringLoopOptions
+    private readonly options: MonitoringLoopOptions,
+    private readonly postExitSwap: PostExitSwapService | null = null
   ) {}
 
   async run(signal?: AbortSignal): Promise<void> {
@@ -98,6 +100,7 @@ export class MonitoringLoop {
 
     const txs = await this.manager.exit(position, this.owner);
     await this.store.recordClosed(position.id, txs, nowIso(), reason);
+    await this.postExitSwap?.sweepPositionTokensToSol(position, this.owner);
     logger.info({ position: position.positionAddress, txs, reason }, "Position closed");
   }
 }

@@ -202,6 +202,8 @@ removeLiquidity({
 
 Le SDK peut retourner plusieurs transactions. Elles sont envoyees sequentiellement pour garder l'etat de position coherent.
 
+Apres la sortie DLMM, les tokens retires reviennent au wallet. Si `POST_EXIT_SWAP_TO_SOL=true`, `PostExitSwapService` lit les soldes wallet des deux mints de la position, ignore SOL et les montants sous `POST_EXIT_SWAP_MIN_USD`, puis utilise Jupiter Swap API pour convertir les tokens non-SOL en SOL. Ce sweep est appele apres les sorties TP/SL, apres `start:exit-all`, et peut etre lance seul avec `start:sweep-to-sol` pour nettoyer les tokens deja recuperes d'une ancienne position fermee.
+
 ## Gestion d'erreurs
 
 ### Slippage et deplacement du bin actif

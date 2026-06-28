@@ -83,6 +83,7 @@ const schema = z.object({
   DEXSCREENER_API_BASE: z.string().url().default("https://api.dexscreener.com"),
   DEXSCREENER_ENABLED: boolDefault(true),
   JUPITER_TOKEN_API_BASE: z.string().url().default("https://lite-api.jup.ag/tokens/v2"),
+  JUPITER_SWAP_API_BASE: z.string().url().default("https://lite-api.jup.ag/swap/v1"),
   JUPITER_API_KEY: z.string().optional(),
   JUPITER_ENABLED: boolDefault(true),
   JUPITER_FAIL_CLOSED: boolDefault(true),
@@ -94,6 +95,10 @@ const schema = z.object({
   JUPITER_MAX_DEV_BALANCE_PCT: z.coerce.number().min(0).max(100).default(8),
   JUPITER_REQUIRE_MINT_AUTHORITY_DISABLED: boolDefault(true),
   JUPITER_REQUIRE_FREEZE_AUTHORITY_DISABLED: boolDefault(true),
+  POST_EXIT_SWAP_TO_SOL: boolDefault(true),
+  POST_EXIT_SWAP_MIN_USD: z.coerce.number().min(0).default(0.25),
+  POST_EXIT_SWAP_SLIPPAGE_BPS: z.coerce.number().int().min(1).max(5_000).default(150),
+  POST_EXIT_SWAP_RESTRICT_INTERMEDIATE_TOKENS: boolDefault(true),
   WEB_PORT: z.coerce.number().int().min(1).max(65_535).default(8787),
   WEB_HOST: z.string().default("127.0.0.1"),
   PAPER_STATE_PATH: z.string().default("./data/paper-state.json"),
@@ -173,6 +178,7 @@ export const config = {
     dexScreenerApiBase: env.DEXSCREENER_API_BASE,
     dexScreenerEnabled: env.DEXSCREENER_ENABLED,
     jupiterTokenApiBase: env.JUPITER_TOKEN_API_BASE,
+    jupiterSwapApiBase: env.JUPITER_SWAP_API_BASE,
     jupiterApiKey: env.JUPITER_API_KEY,
     jupiterEnabled: env.JUPITER_ENABLED,
     jupiterFailClosed: env.JUPITER_FAIL_CLOSED,
@@ -184,6 +190,12 @@ export const config = {
     jupiterMaxDevBalancePct: env.JUPITER_MAX_DEV_BALANCE_PCT,
     jupiterRequireMintAuthorityDisabled: env.JUPITER_REQUIRE_MINT_AUTHORITY_DISABLED,
     jupiterRequireFreezeAuthorityDisabled: env.JUPITER_REQUIRE_FREEZE_AUTHORITY_DISABLED
+  },
+  postExitSwap: {
+    enabled: env.POST_EXIT_SWAP_TO_SOL,
+    minSwapUsd: env.POST_EXIT_SWAP_MIN_USD,
+    slippageBps: env.POST_EXIT_SWAP_SLIPPAGE_BPS,
+    restrictIntermediateTokens: env.POST_EXIT_SWAP_RESTRICT_INTERMEDIATE_TOKENS
   },
   web: {
     port: env.WEB_PORT,
