@@ -20,6 +20,8 @@ Pour un test live avec un petit wallet SOL, le mode par defaut est `ENTRY_SIZING
 
 Pour ajouter une position supplementaire pendant que le monitor PM2 tourne deja, utilise `npm run start:open-once`. Cette commande scanne, ignore les pools deja actives, ouvre une seule position avec le sizing wallet-ratio, puis s'arrete. Elle ne lance pas un deuxieme monitor. Les ouvertures passent par un lock fichier pour eviter qu'un `open-once` et l'auto-reopen choisissent la meme pool au meme moment.
 
+Pour lancer le bot et remplir automatiquement plusieurs positions, regle `MAX_OPEN_POSITIONS=3` et `AUTO_OPEN_TARGET_POSITIONS=3`, puis lance `npm run start:bot`. Le bot ouvre jusqu'a 3 positions actives, en evitant les pools deja ouvertes, puis passe en monitoring. Si tu veux seulement remplir la cible sans lancer le monitor, utilise `npm run start:fill-target`.
+
 Les sorties live utilisent `TAKE_PROFIT_PCT=5` et `STOP_LOSS_PCT=-12` dans `.env.example`. Si tu ecris `STOP_LOSS_PCT=12`, le bot le normalise en `-12`.
 
 La range DLMM est definie par `BID_ASK_RANGE_BINS=69`. En position balancee, cela signifie 69 bins au total autour du bin actif. En `ENTRY_SOL_ONLY=true`, le bot decale la range du cote single-sided pour avoir 69 bins utiles avec le token depose. L'ancien `BID_ASK_HALF_WIDTH_BINS` reste accepte en fallback, mais la config force au minimum 69 bins.

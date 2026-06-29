@@ -35,6 +35,10 @@ async function main(): Promise<void> {
   }
 
   if (args.has("--monitor")) {
+    if (args.has("--fill-target")) {
+      await requireOwner(services);
+      await fillTargetPositions(services, "Opened startup target position");
+    }
     await runMonitor(services);
     return;
   }
@@ -46,14 +50,24 @@ async function main(): Promise<void> {
   }
 
   const openOnce = args.has("--open-once");
-  if (!openOnce && !config.autoOpen) {
+  const fillTarget = args.has("--fill-target");
+  if (!openOnce && !fillTarget && !config.autoOpen) {
     const scored = await services.scanner.scan();
     printTopPools(scored);
     return;
   }
 
-  if (!services.owner) {
-    throw new Error("Opening a managed position requires WALLET_PRIVATE_KEY.");
+  await requireOwner(services);
+
+  if (fillTarget || config.autoOpen) {
+    await fillTargetPositions(services, fillTarget ? "Opened target position" : "Opened managed position");
+
+    if (fillTarget) {
+      return;
+    }
+
+    await runMonitor(services);
+    return;
   }
 
   await openNextEligiblePosition(
@@ -270,17 +284,71 @@ function createAutoReopenHandler(
   };
 }
 
+async function fillTargetPositions(services: EntryRuntimeServices, logMessage: string): Promise<void> {
+  const targetCount = Math.min(config.autoOpenTargetPositions, config.maxOpenPositions);
+  let openedCount = 0;
+
+  while (true) {
+    let opened: ManagedPositionState | null;
+    try {
+      opened = await openNextEligiblePositionIfBelowTarget(services, targetCount, logMessage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn({ openedCount, targetCount, error: message }, "Target position fill stopped before target was reached");
+      return;
+    }
+
+    if (!opened) {
+      logger.info(
+        {
+          activeCount: services.store.listActive().length,
+          targetCount,
+          openedCount
+        },
+        "Target position fill complete"
+      );
+      return;
+    }
+
+    openedCount += 1;
+  }
+}
+
 async function openNextEligiblePosition(
   services: EntryRuntimeServices,
   logMessage: string
 ): Promise<ManagedPositionState> {
+  const opened = await openNextEligiblePositionIfBelowTarget(services, config.maxOpenPositions, logMessage);
+  if (!opened) {
+    throw new Error(`Max active positions reached: ${config.maxOpenPositions}`);
+  }
+  return opened;
+}
+
+async function openNextEligiblePositionIfBelowTarget(
+  services: EntryRuntimeServices,
+  targetCount: number,
+  logMessage: string
+): Promise<ManagedPositionState | null> {
   return services.openLock.runExclusive(logMessage, async () => {
     await services.store.reload();
+    const activeCount = services.store.listActive().length;
+    if (activeCount >= targetCount) {
+      logger.info({ activeCount, targetCount }, "Open skipped because target active count is reached");
+      return null;
+    }
+
     const scored = await services.scanner.scan();
     printTopPools(scored);
     const selection = await selectEntry(scored, services);
     return openSelectedPosition(selection.target, selection.allocation, services, logMessage);
   });
+}
+
+async function requireOwner(services: { owner: ReturnType<typeof loadKeypair> | null }): Promise<void> {
+  if (!services.owner) {
+    throw new Error("Opening a managed position requires WALLET_PRIVATE_KEY.");
+  }
 }
 
 async function openSelectedPosition(
