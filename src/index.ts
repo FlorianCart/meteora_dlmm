@@ -41,16 +41,31 @@ async function main(): Promise<void> {
   const scored = await services.scanner.scan();
   printTopPools(scored);
 
-  if (args.has("--scan") || !config.autoOpen) {
+  if (args.has("--scan")) {
+    return;
+  }
+
+  const openOnce = args.has("--open-once");
+  if (!openOnce && !config.autoOpen) {
     return;
   }
 
   if (!services.owner) {
-    throw new Error("AUTO_OPEN=true requires WALLET_PRIVATE_KEY.");
+    throw new Error("Opening a managed position requires WALLET_PRIVATE_KEY.");
   }
 
   const selection = await selectEntry(scored, services);
-  await openSelectedPosition(selection.target, selection.allocation, services, "Opened managed position");
+  await openSelectedPosition(
+    selection.target,
+    selection.allocation,
+    services,
+    openOnce ? "Opened one additional managed position" : "Opened managed position"
+  );
+
+  if (openOnce) {
+    return;
+  }
+
   await runMonitor(services);
 }
 

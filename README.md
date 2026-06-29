@@ -18,6 +18,8 @@ Par defaut, le bot ne trade pas. Les transactions d'entree ne partent que si `AU
 
 Pour un test live avec un petit wallet SOL, le mode par defaut est `ENTRY_SIZING_MODE=wallet-ratio`: le bot calcule la taille de la prochaine position depuis le solde SOL disponible et l'exposition deja ouverte. Les valeurs d'exemple sont des ratios: reserve `10%`, taille cible `25%`, taille minimale `4%`, taille maximale `20%`, exposition totale maximale `70%`. Sur un wallet de `0.5 SOL`, cela donne naturellement environ `0.05 SOL` de reserve, `0.02 SOL` de minimum et `0.1 SOL` de maximum par position, mais ces montants changent si le wallet change. `ENTRY_SOL_ONLY=true` force une entree single-sided sur le cote SOL de la pool, sans supposer que le wallet possede deja le token risque.
 
+Pour ajouter une position supplementaire pendant que le monitor PM2 tourne deja, utilise `npm run start:open-once`. Cette commande scanne, ignore les pools deja actives, ouvre une seule position avec le sizing wallet-ratio, puis s'arrete. Elle ne lance pas un deuxieme monitor.
+
 Les sorties live utilisent `TAKE_PROFIT_PCT=5` et `STOP_LOSS_PCT=-12` dans `.env.example`. Si tu ecris `STOP_LOSS_PCT=12`, le bot le normalise en `-12`.
 
 La range DLMM est definie par `BID_ASK_RANGE_BINS=69`. En position balancee, cela signifie 69 bins au total autour du bin actif. En `ENTRY_SOL_ONLY=true`, le bot decale la range du cote single-sided pour avoir 69 bins utiles avec le token depose. L'ancien `BID_ASK_HALF_WIDTH_BINS` reste accepte en fallback, mais la config force au minimum 69 bins.
