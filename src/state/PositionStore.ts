@@ -38,6 +38,12 @@ export class PositionStore {
     this.loaded = true;
   }
 
+  async reload(): Promise<void> {
+    this.positions.clear();
+    this.loaded = false;
+    await this.load();
+  }
+
   list(): ManagedPositionState[] {
     return [...this.positions.values()];
   }

@@ -12,6 +12,7 @@ import { MeteoraDataApi } from "./services/MeteoraDataApi.js";
 import { PostExitSwapService } from "./services/PostExitSwapService.js";
 import { RpcService } from "./services/RpcService.js";
 import { RugCheckApi } from "./services/RugCheckApi.js";
+import { FileLock } from "./state/FileLock.js";
 import { PositionStore } from "./state/PositionStore.js";
 import type { ExitReason, ManagedPositionState, ScoredPool } from "./types.js";
 import { logger } from "./utils/logger.js";
@@ -38,15 +39,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  const scored = await services.scanner.scan();
-  printTopPools(scored);
-
   if (args.has("--scan")) {
+    const scored = await services.scanner.scan();
+    printTopPools(scored);
     return;
   }
 
   const openOnce = args.has("--open-once");
   if (!openOnce && !config.autoOpen) {
+    const scored = await services.scanner.scan();
+    printTopPools(scored);
     return;
   }
 
@@ -54,10 +56,7 @@ async function main(): Promise<void> {
     throw new Error("Opening a managed position requires WALLET_PRIVATE_KEY.");
   }
 
-  const selection = await selectEntry(scored, services);
-  await openSelectedPosition(
-    selection.target,
-    selection.allocation,
+  await openNextEligiblePosition(
     services,
     openOnce ? "Opened one additional managed position" : "Opened managed position"
   );
@@ -76,6 +75,7 @@ async function buildServices(): Promise<{
   monitor: MonitoringLoop;
   postExitSwap: PostExitSwapService | null;
   allocator: WalletAllocator | null;
+  openLock: FileLock;
   owner: ReturnType<typeof loadKeypair> | null;
 }> {
   const meteoraData = new MeteoraDataApi(
@@ -155,6 +155,7 @@ async function buildServices(): Promise<{
 
   const store = new PositionStore(config.positionStorePath);
   await store.load();
+  const openLock = new FileLock(`${config.positionStorePath}.open.lock`);
 
   const dlmm = new MeteoraDlmmClient(rpc);
   const valuator = new PositionValuator(meteoraData);
@@ -203,6 +204,7 @@ async function buildServices(): Promise<{
     store,
     positionManager,
     allocator,
+    openLock,
     owner
   });
   const monitor = new MonitoringLoop(store, positionManager, owner, config.monitor, postExitSwap, autoReopen);
@@ -214,6 +216,7 @@ async function buildServices(): Promise<{
     monitor,
     postExitSwap,
     allocator,
+    openLock,
     owner
   };
 }
@@ -223,6 +226,7 @@ interface EntryRuntimeServices {
   store: PositionStore;
   positionManager: PositionManager;
   allocator: WalletAllocator | null;
+  openLock: FileLock;
   owner: ReturnType<typeof loadKeypair> | null;
 }
 
@@ -270,10 +274,13 @@ async function openNextEligiblePosition(
   services: EntryRuntimeServices,
   logMessage: string
 ): Promise<ManagedPositionState> {
-  const scored = await services.scanner.scan();
-  printTopPools(scored);
-  const selection = await selectEntry(scored, services);
-  return openSelectedPosition(selection.target, selection.allocation, services, logMessage);
+  return services.openLock.runExclusive(logMessage, async () => {
+    await services.store.reload();
+    const scored = await services.scanner.scan();
+    printTopPools(scored);
+    const selection = await selectEntry(scored, services);
+    return openSelectedPosition(selection.target, selection.allocation, services, logMessage);
+  });
 }
 
 async function openSelectedPosition(
