@@ -111,11 +111,17 @@ export class PositionStore {
 
   async recordClosed(id: string, txs: string[], closedAt: string, exitReason?: ExitReason): Promise<void> {
     const position = this.require(id);
-    const { outOfRangeDirection: _direction, outOfRangeSince: _since, ...positionWithoutOutOfRange } = position;
+    const {
+      lastError: _lastError,
+      outOfRangeDirection: _direction,
+      outOfRangeSince: _since,
+      ...positionWithoutTransientState
+    } = position;
     this.positions.set(id, {
-      ...positionWithoutOutOfRange,
+      ...positionWithoutTransientState,
       status: "CLOSED",
       ...(exitReason ? { exitReason } : {}),
+      errorCount: 0,
       exitTxs: txs,
       closedAt
     });

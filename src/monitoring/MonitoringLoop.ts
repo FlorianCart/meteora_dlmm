@@ -99,6 +99,11 @@ export class MonitoringLoop {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (position.status === "EXITING" && isPositionNotFound(message)) {
+        await this.markMissingExitAsClosed(position, message);
+        return;
+      }
+
       await this.store.recordError(position.id, message);
       logger.error({ position: position.positionAddress, error: message }, "Position monitoring failed");
     }
@@ -201,6 +206,39 @@ export class MonitoringLoop {
       await this.onPositionClosed(closedPosition, reason);
     }
   }
+
+  private async markMissingExitAsClosed(position: ManagedPositionState, message: string): Promise<void> {
+    if (!this.owner) {
+      throw new Error("Wallet is required to reconcile a missing exiting position.");
+    }
+
+    const reason = position.exitReason ?? "MANUAL";
+    logger.warn(
+      {
+        position: position.positionAddress,
+        pool: position.poolAddress,
+        reason,
+        error: message
+      },
+      "Exiting position is no longer on-chain; marking closed"
+    );
+
+    await this.store.recordClosed(position.id, [], nowIso(), reason);
+    const closedPosition = this.store.get(position.id) ?? { ...position, status: "CLOSED" };
+
+    if (this.postExitSwap) {
+      try {
+        await this.postExitSwap.sweepPositionTokensToSol(position, this.owner);
+      } catch (error) {
+        const sweepError = error instanceof Error ? error.message : String(error);
+        logger.error({ position: position.positionAddress, error: sweepError }, "Post-reconcile SOL sweep failed");
+      }
+    }
+
+    if (this.onPositionClosed) {
+      await this.onPositionClosed(closedPosition, reason);
+    }
+  }
 }
 
 function getOutOfRangeDirection(activeBinId: number, lowerBinId: number, upperBinId: number): OutOfRangeDirection | null {
@@ -220,4 +258,8 @@ function elapsedSinceMs(sinceIso: string, nowIsoValue: string): number {
     return 0;
   }
   return Math.max(0, nowMs - sinceMs);
+}
+
+function isPositionNotFound(message: string): boolean {
+  return /Position .* not found in pool/i.test(message);
 }
