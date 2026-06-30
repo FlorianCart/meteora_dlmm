@@ -239,13 +239,20 @@ export type OutOfRangeDirection = "ABOVE" | "BELOW";
 
 export interface ProfitSnapshot {
   timestamp: string;
+  valuationSource?: "meteora-data-api" | "jupiter-exit-quote";
   activeBinId: number;
   tokenXPriceUsd: number;
   tokenYPriceUsd: number;
+  solPriceUsd?: number;
   liquidityXRaw: string;
   liquidityYRaw: string;
   feeXRaw: string;
   feeYRaw: string;
+  liquidityValueSol?: number;
+  feeValueSol?: number;
+  currentValueSol?: number;
+  entryValueSol?: number;
+  profitSol?: number;
   liquidityValueUsd: number;
   feeValueUsd: number;
   claimedFeeValueUsd: number;

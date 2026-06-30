@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type {
@@ -15,6 +16,7 @@ interface PositionStoreFile {
 export class PositionStore {
   private positions = new Map<string, ManagedPositionState>();
   private loaded = false;
+  private flushQueue = Promise.resolve();
 
   constructor(private readonly filePath: string) {}
 
@@ -137,8 +139,14 @@ export class PositionStore {
   }
 
   private async flush(): Promise<void> {
+    const pending = this.flushQueue.then(() => this.writeSnapshot());
+    this.flushQueue = pending.catch(() => undefined);
+    return pending;
+  }
+
+  private async writeSnapshot(): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tmp = `${this.filePath}.tmp`;
+    const tmp = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
     const payload: PositionStoreFile = {
       positions: [...this.positions.values()].sort((a, b) => a.openedAt.localeCompare(b.openedAt))
     };

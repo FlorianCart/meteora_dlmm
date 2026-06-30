@@ -16,6 +16,7 @@ interface LiveStatus {
   activeCount: number;
   closedCount: number;
   entryValueUsd: number;
+  liquidityValueUsd: number;
   currentValueUsd: number;
   profitUsd: number;
   profitPct: number;
@@ -109,6 +110,10 @@ async function liveStatus(): Promise<LiveStatus> {
   const active = positions.filter((position) => position.status === "OPEN" || position.status === "EXITING");
   const closed = positions.filter((position) => position.status === "CLOSED");
   const entryValueUsd = active.reduce((sum, position) => sum + position.entryValueUsd, 0);
+  const liquidityValueUsd = active.reduce((sum, position) => {
+    const snapshot = position.lastSnapshot;
+    return sum + (snapshot?.liquidityValueUsd ?? snapshot?.currentValueUsd ?? position.entryValueUsd);
+  }, 0);
   const currentValueUsd = active.reduce(
     (sum, position) => sum + (position.lastSnapshot?.currentValueUsd ?? position.entryValueUsd),
     0
@@ -126,6 +131,7 @@ async function liveStatus(): Promise<LiveStatus> {
     activeCount: active.length,
     closedCount: closed.length,
     entryValueUsd,
+    liquidityValueUsd,
     currentValueUsd,
     profitUsd,
     profitPct,

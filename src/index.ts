@@ -7,6 +7,7 @@ import { PoolScanner } from "./scanner/PoolScanner.js";
 import { DexScreenerApi } from "./services/DexScreenerApi.js";
 import { HttpClient } from "./services/HttpClient.js";
 import { JupiterTokenApi } from "./services/JupiterTokenApi.js";
+import { JupiterQuoteService } from "./services/JupiterQuoteService.js";
 import { JupiterSwapService } from "./services/JupiterSwapService.js";
 import { MeteoraDataApi } from "./services/MeteoraDataApi.js";
 import { PostExitSwapService } from "./services/PostExitSwapService.js";
@@ -172,10 +173,25 @@ async function buildServices(): Promise<{
   const openLock = new FileLock(`${config.positionStorePath}.open.lock`);
 
   const dlmm = new MeteoraDlmmClient(rpc);
-  const valuator = new PositionValuator(meteoraData);
+  const jupiterSwapHeaders = config.apis.jupiterApiKey ? { "x-api-key": config.apis.jupiterApiKey } : undefined;
+  const jupiterQuote = config.apis.jupiterEnabled
+    ? new JupiterQuoteService(
+        new HttpClient({
+          baseUrl: config.apis.jupiterSwapApiBase,
+          retries: 2,
+          timeoutMs: 12_000,
+          minIntervalMs: 150,
+          ...(jupiterSwapHeaders ? { defaultHeaders: jupiterSwapHeaders } : {})
+        }),
+        {
+          slippageBps: config.postExitSwap.slippageBps,
+          restrictIntermediateTokens: config.postExitSwap.restrictIntermediateTokens
+        }
+      )
+    : null;
+  const valuator = new PositionValuator(meteoraData, jupiterQuote);
   const positionManager = new PositionManager(store, dlmm, valuator, config.maxOpenPositions);
   const owner = config.walletPrivateKey ? loadKeypair(config.walletPrivateKey) : null;
-  const jupiterSwapHeaders = config.apis.jupiterApiKey ? { "x-api-key": config.apis.jupiterApiKey } : undefined;
   const postExitSwap = owner
     ? new PostExitSwapService(
         rpc,

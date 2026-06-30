@@ -78,7 +78,8 @@ function renderLive(live) {
   const pnlClass = live.profitUsd < 0 ? "loss" : "";
   const items = [
     { label: "Active", value: String(live.activeCount), delta: `${live.closedCount} closed` },
-    { label: "Current", value: money.format(live.currentValueUsd), delta: `Entry ${money.format(live.entryValueUsd)}` },
+    { label: "Net current", value: money.format(live.currentValueUsd), delta: `Entry ${money.format(live.entryValueUsd)}` },
+    { label: "Liquidity", value: money.format(live.liquidityValueUsd ?? 0), delta: "excludes fees" },
     { label: "Live PnL", value: signedMoney(live.profitUsd), delta: pct(live.profitPct), className: pnlClass },
     { label: "Fees", value: money.format(live.feeValueUsd), delta: feeYield(live.feeValueUsd, live.entryValueUsd) },
     {
@@ -86,8 +87,7 @@ function renderLive(live) {
       value: outOfRange.length ? `${outOfRange.length} alert` : "Clear",
       delta: nextExit ? `Exit in ${durationLabel(nextExit.remainingMs)}` : `${activePositions.length} watched`,
       className: rangeMetricClass
-    },
-    { label: "Cooldown", value: durationLabel(cooldownMs), delta: "out-of-range up" }
+    }
   ];
 
   $("liveMetrics").innerHTML = items.map(metricHtml).join("");
@@ -154,9 +154,11 @@ function renderLiveExposure(live, activePositions, ranges) {
   $("liveExposureState").textContent = `${snapshotCount}/${activePositions.length} snapshots`;
   $("liveExposure").innerHTML = [
     { label: "Entry capital", value: money.format(live.entryValueUsd), note: `${activePositions.length} active positions` },
-    { label: "Current value", value: money.format(live.currentValueUsd), note: signedMoney(live.profitUsd) },
+    { label: "Net current", value: money.format(live.currentValueUsd), note: signedMoney(live.profitUsd) },
+    { label: "Liquidity only", value: money.format(live.liquidityValueUsd ?? 0), note: "before unclaimed fees" },
     { label: "Fee yield", value: pct(feesPct), note: money.format(live.feeValueUsd) },
-    { label: "Avg PnL", value: pct(avgPnl), note: `${num.format(worstDistance)} bins max distance` }
+    { label: "Avg PnL", value: pct(avgPnl), note: `${num.format(worstDistance)} bins max distance` },
+    { label: "Cooldown", value: durationLabel(live.outOfRangeUpCooldownMs ?? 300000), note: "out-of-range up" }
   ]
     .map(
       (item) => `
@@ -179,27 +181,31 @@ function renderLivePositions(positions, cooldownMs) {
       .map((position) => {
         const snapshot = position.lastSnapshot;
         const currentValue = snapshot?.currentValueUsd ?? position.entryValueUsd;
+        const liquidityValue = snapshot?.liquidityValueUsd ?? currentValue - (snapshot?.feeValueUsd ?? 0);
         const fees = snapshot?.feeValueUsd ?? 0;
         const profitUsd = snapshot?.profitUsd ?? currentValue - position.entryValueUsd;
         const profitPct = snapshot?.profitPct ?? (position.entryValueUsd > 0 ? (profitUsd / position.entryValueUsd) * 100 : 0);
         const range = liveRangeInfo(position, cooldownMs);
+        const valuationSource = snapshot?.valuationSource ?? "legacy";
         return `
           <tr>
             <td title="${position.poolAddress}">${escapeHtml(poolLabel(position))}</td>
             <td><span class="tag ${liveStatusClass(position.status)}">${escapeHtml(position.status)}</span></td>
             <td class="num">${money.format(position.entryValueUsd)}</td>
+            <td class="num">${money.format(liquidityValue)}</td>
             <td class="num">${money.format(currentValue)}</td>
             <td class="num">${money.format(fees)}</td>
             <td class="num ${profitUsd >= 0 ? "positive" : "negative"}">${signedMoney(profitUsd)} / ${pct(profitPct)}</td>
             <td class="num">${pct(position.takeProfitPct)} / ${pct(position.stopLossPct)}</td>
             <td class="num">${position.lowerBinId} -> ${position.upperBinId}</td>
             <td title="${escapeHtml(range.detail)}">${rangeCellHtml(range)}</td>
+            <td><span class="tag info">${escapeHtml(valuationSource)}</span></td>
             <td>${relative(position.openedAt)}</td>
             <td title="${position.positionAddress}" class="address">${shortAddress(position.positionAddress)}</td>
           </tr>
         `;
       })
-      .join("") || `<tr><td class="empty" colspan="11">No live positions tracked</td></tr>`;
+      .join("") || `<tr><td class="empty" colspan="13">No live positions tracked</td></tr>`;
 }
 
 function rangeCellHtml(range) {
