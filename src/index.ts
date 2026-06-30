@@ -23,6 +23,7 @@ import { PositionValuator } from "./valuation/PositionValuator.js";
 async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
   const services = await buildServices();
+  const shouldFillTarget = args.has("--fill-target");
 
   if (args.has("--exit-all")) {
     await exitAllPositions(services);
@@ -35,11 +36,11 @@ async function main(): Promise<void> {
   }
 
   if (args.has("--monitor")) {
-    if (args.has("--fill-target")) {
+    if (shouldFillTarget) {
       await requireOwner(services);
       await fillTargetPositions(services, "Opened startup target position");
     }
-    await runMonitor(services);
+    await runMonitor(services, { topUpTarget: shouldFillTarget || config.autoTopUpTargetPositions });
     return;
   }
 
@@ -50,8 +51,7 @@ async function main(): Promise<void> {
   }
 
   const openOnce = args.has("--open-once");
-  const fillTarget = args.has("--fill-target");
-  if (!openOnce && !fillTarget && !config.autoOpen) {
+  if (!openOnce && !shouldFillTarget && !config.autoOpen) {
     const scored = await services.scanner.scan();
     printTopPools(scored);
     return;
@@ -59,14 +59,14 @@ async function main(): Promise<void> {
 
   await requireOwner(services);
 
-  if (fillTarget || config.autoOpen) {
-    await fillTargetPositions(services, fillTarget ? "Opened target position" : "Opened managed position");
+  if (shouldFillTarget || config.autoOpen) {
+    await fillTargetPositions(services, shouldFillTarget ? "Opened target position" : "Opened managed position");
 
-    if (fillTarget) {
+    if (shouldFillTarget) {
       return;
     }
 
-    await runMonitor(services);
+    await runMonitor(services, { topUpTarget: config.autoTopUpTargetPositions });
     return;
   }
 
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  await runMonitor(services);
+  await runMonitor(services, { topUpTarget: config.autoTopUpTargetPositions });
 }
 
 async function buildServices(): Promise<{
@@ -453,11 +453,35 @@ async function resolveEntryAllocation(
   return allocation;
 }
 
-async function runMonitor(services: { monitor: MonitoringLoop }): Promise<void> {
+async function runMonitor(
+  services: EntryRuntimeServices & { monitor: MonitoringLoop },
+  options: { topUpTarget: boolean }
+): Promise<void> {
   const controller = new AbortController();
   process.once("SIGINT", () => controller.abort());
   process.once("SIGTERM", () => controller.abort());
-  await services.monitor.run(controller.signal);
+  if (!options.topUpTarget) {
+    await services.monitor.run(controller.signal);
+    return;
+  }
+
+  await Promise.all([services.monitor.run(controller.signal), runTargetTopUpLoop(services, controller.signal)]);
+}
+
+async function runTargetTopUpLoop(services: EntryRuntimeServices, signal: AbortSignal): Promise<void> {
+  while (!signal.aborted) {
+    await sleep(config.autoTopUpIntervalMs);
+    if (signal.aborted) {
+      return;
+    }
+
+    try {
+      await fillTargetPositions(services, "Auto top-up target position");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ error: message }, "Auto top-up failed");
+    }
+  }
 }
 
 async function exitAllPositions(services: {
